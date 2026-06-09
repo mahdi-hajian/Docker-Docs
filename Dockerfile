@@ -31,7 +31,7 @@ RUN dnf -y updateinfo list --security && \
                 nginx \
                 httpd-tools \
                 wget -y && \
-    pip3 install --no-cache-dir redis kubernetes && \
+    pip3 install --no-cache-dir redis kubernetes==35.0.0 && \
     wget -O /usr/local/bin/dumb-init https://github.com/Yelp/dumb-init/releases/download/v1.2.5/dumb-init_1.2.5_$(uname -m) && \
     chmod +x /usr/local/bin/dumb-init && \
     mkdir -p /oracle/instantclient /opt/oracle /home/ds /etc/nginx/includes && \
