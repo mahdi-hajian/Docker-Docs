@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>راهنمای Kubernetes / Helm — ONLYOFFICE Docker-Docs</title>
+  <style>
+    :root {
+      --bg: #f6f3ff;
+      --card: #ffffff;
+      --text: #1e1b4b;
+      --muted: #5b5675;
+      --accent: #6d28d9;
+      --border: #ddd6fe;
+      --code-bg: #1e1b4b;
+      --code-fg: #ede9fe;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Vazirmatn", "Tahoma", "Segoe UI", sans-serif;
+      background: linear-gradient(160deg, #ede9fe, var(--bg) 50%);
+      color: var(--text);
+      line-height: 1.85;
+    }
+    main { max-width: 920px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+    h1, h2, h3 { color: #4c1d95; line-height: 1.35; }
+    h1 { font-size: 1.7rem; }
+    h2 { margin-top: 2rem; border-bottom: 2px solid var(--border); padding-bottom: 0.3rem; }
+    .lead { color: var(--muted); }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.2rem;
+      margin: 1rem 0;
+    }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; background: #fff; }
+    th, td { border: 1px solid var(--border); padding: 0.55rem 0.7rem; text-align: right; vertical-align: top; }
+    th { background: #ddd6fe; }
+    code, pre { font-family: ui-monospace, Consolas, monospace; direction: ltr; text-align: left; }
+    code { background: #ede9fe; padding: 0.1rem 0.35rem; border-radius: 4px; }
+    pre {
+      background: var(--code-bg);
+      color: var(--code-fg);
+      padding: 1rem;
+      border-radius: 10px;
+      overflow-x: auto;
+    }
+    pre code { background: transparent; color: inherit; padding: 0; }
+    ol, ul { padding-right: 1.2rem; }
+    a { color: var(--accent); }
+    .note { border-right: 4px solid var(--accent); padding-right: 0.8rem; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>راهنمای استفاده در Kubernetes و Helm</h1>
+  <p class="lead">
+    این راهنما بعد از ساخت ایمیج‌ها از ریپوی Docker-Docs، مسیر استقرار روی کلاستر را توضیح می‌دهد.
+    Chart رسمی: <a href="https://github.com/ONLYOFFICE/Kubernetes-Docs">ONLYOFFICE/Kubernetes-Docs</a>
+  </p>
+
+  <h2>پیش‌فرض مهم</h2>
+  <div class="card note">
+    <ul>
+      <li>ایمیج‌های این ریپو برای دیپلوی cluster طراحی شده‌اند.</li>
+      <li>Clustering تجاری معمولاً با لایسنس <strong>Developer / Enterprise</strong> است.</li>
+      <li>کانتینرها به‌صورت پیش‌فرض با کاربر <code>ds</code> / UID <strong>101</strong> اجرا می‌شوند.</li>
+    </ul>
+  </div>
+
+  <h2>گام ۱ — بیلد و push ایمیج</h2>
+  <pre><code># از ریپوی Docker-Docs
+./build.sh          # یا .\build.ps1 روی ویندوز
+
+# تگ برای رجیستری خودت
+docker tag onlyoffice/docs-cluster-de:latest repo.example.com/onlyoffice/docs-cluster-de:9.4.1
+docker tag onlyoffice/docs-utils:latest      repo.example.com/onlyoffice/docs-utils:9.4.1
+docker tag onlyoffice/docs-metrics:latest    repo.example.com/onlyoffice/docs-metrics:9.4.1
+
+docker push repo.example.com/onlyoffice/docs-cluster-de:9.4.1
+docker push repo.example.com/onlyoffice/docs-utils:9.4.1
+docker push repo.example.com/onlyoffice/docs-metrics:9.4.1</code></pre>
+  <p>
+    برای سازگاری با مقادیر پیش‌فرض قدیمی Helm می‌توانی ایمیج‌های
+    <code>docs-proxy-de</code> / <code>docs-docservice-de</code> / <code>docs-converter-de</code>
+    را هم push کنی؛ یا در values همه را به <code>docs-cluster-de</code> ببری.
+  </p>
+
+  <h2>گام ۲ — وابستگی‌ها</h2>
+  <table>
+    <thead>
+      <tr><th>سرویس</th><th>توضیح</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>PostgreSQL</td>
+        <td>معمولی (≥ ۱۲.۹). لازم نیست ایمیج docs-postgresql باشد. یک‌بار <code>createdb.sql</code> را با Job/Init اجرا کن.</td>
+      </tr>
+      <tr>
+        <td>Redis</td>
+        <td>برای کش و هماهنگی سشن‌ها</td>
+      </tr>
+      <tr>
+        <td>RabbitMQ (یا ActiveMQ)</td>
+        <td>صف بین docservice و converter</td>
+      </tr>
+      <tr>
+        <td>Storage / PVC</td>
+        <td>مسیر داده‌هایی مثل <code>/var/lib/onlyoffice</code> با مالکیت مناسب UID 101</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>گام ۳ — اجرای schema روی Postgres معمولی</h2>
+  <p>نمونه مفهوم Job:</p>
+  <pre><code>apiVersion: batch/v1
+kind: Job
+metadata:
+  name: onlyoffice-db-init
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: psql
+          image: postgres:15
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: onlyoffice-db
+                  key: password
+          command: ["bash","-lc"]
+          args:
+            - |
+              psql -h $DB_HOST -U $DB_USER -d $DB_NAME -f /sql/createdb.sql
+          volumeMounts:
+            - name: sql
+              mountPath: /sql
+      volumes:
+        - name: sql
+          configMap:
+            name: onlyoffice-createdb-sql</code></pre>
+  <p>فایل SQL از پکیج Docs: مسیر تقریبی <code>.../documentserver/server/schema/postgresql/createdb.sql</code></p>
+
+  <h2>گام ۴ — مقادیر مهم Helm / securityContext</h2>
+  <pre><code>images:
+  # مثال با رجیستری شخصی و ایمیج یکپارچه
+  # در values واقعی هر کامپوننت repository خودش را دارد؛
+  # می‌توانی همه را به docs-cluster-de تنظیم کنی.
+
+podSecurityContext:
+  enabled: true
+  fsGroup: 101
+
+docservice:
+  containerSecurityContext:
+    enabled: true
+    runAsUser: 101
+    runAsGroup: 101
+    runAsNonRoot: true
+  image:
+    repository: repo.example.com/onlyoffice/docs-cluster-de
+    tag: "9.4.1"
+
+proxy:
+  containerSecurityContext:
+    enabled: true
+    runAsUser: 101
+    runAsGroup: 101
+  image:
+    repository: repo.example.com/onlyoffice/docs-cluster-de
+    tag: "9.4.1"
+
+converter:
+  containerSecurityContext:
+    enabled: true
+    runAsUser: 101
+    runAsGroup: 101
+  image:
+    repository: repo.example.com/onlyoffice/docs-cluster-de
+    tag: "9.4.1"</code></pre>
+  <p class="card">
+    پیش‌فرض chart ممکن است نام‌های جدا مثل <code>docs-docservice-de</code> باشد
+    (backward compatibility). خود ONLYOFFICE گفته می‌توانی به‌جایشان
+    <code>docs-cluster-de</code> بگذاری.
+  </p>
+
+  <h2>گام ۵ — لایسنس Developer/Enterprise</h2>
+  <ul>
+    <li>فایل خریداری‌شده: <code>license.lic</code></li>
+    <li>معمولاً روی مسیر داده‌ای معادل <code>/var/www/onlyoffice/Data/license.lic</code> مونت می‌شود</li>
+    <li>بدون لایسنس، ایمیج <code>-de</code> ممکن است بالا بیاید ولی امکانات کامل/cluster محدود است</li>
+  </ul>
+
+  <h2>گام ۶ — نصب Helm (الگو)</h2>
+  <pre><code>helm repo add onlyoffice https://download.onlyoffice.com/charts/stable
+helm repo update
+
+helm upgrade --install docs onlyoffice/docs \
+  -n onlyoffice --create-namespace \
+  -f my-values.yaml</code></pre>
+  <p>نام chart و repo را با نسخهٔ فعلی مستندات رسمی تطبیق بده؛ ممکن است با گذر زمان عوض شود.</p>
+
+  <h2>چک سلامت بعد از دیپلوی</h2>
+  <pre><code>kubectl -n onlyoffice get pods
+kubectl -n onlyoffice logs deploy/docs-docservice --tail=100
+curl https://&lt;your-ingress-host&gt;/healthcheck
+# انتظار: true</code></pre>
+  <p>داخل pod باید کاربر غیر روت باشد (۱۰۱)، مگر اینکه securityContext را خاموش کرده باشی.</p>
+
+  <h2>تفاوت با Docker Compose</h2>
+  <table>
+    <thead>
+      <tr><th>موضوع</th><th>Compose</th><th>Kubernetes</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>ورود ترافیک</td>
+        <td>پورت ۸۰ روی proxy</td>
+        <td>Ingress / Service + proxy Deployment</td>
+      </tr>
+      <tr>
+        <td>ایمیج Docs</td>
+        <td>عمدتاً cluster</td>
+        <td>cluster یا ایمیج‌های جدا (هر دو ممکن)</td>
+      </tr>
+      <tr>
+        <td>Postgres</td>
+        <td>سرویس داخلی compose</td>
+        <td>معمولاً خارجی/مدیریت‌شده + Job برای SQL</td>
+      </tr>
+      <tr>
+        <td>مقیاس</td>
+        <td><code>--scale converter=N</code></td>
+        <td>replicas / HPA روی Deploymentها</td>
+      </tr>
+      <tr>
+        <td>لایسنس cluster</td>
+        <td>برای تست لوکال</td>
+        <td>برای production چندنودی مهم‌تر است</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="card note">
+    <strong>اشتباه رایج:</strong> «Compose به ایمیج جدا نیاز ندارد ولی K8s نیاز دارد.»
+    <br />
+    <strong>درست:</strong> هر دو می‌توانند با <code>docs-cluster</code> کار کنند.
+    Helm فقط به‌صورت پیش‌فرض نام جدا می‌گذارد (backward compatibility).
+    توضیح کامل و تخصصی:
+    <a href="./fa-images-cluster-vs-split.html">fa-images-cluster-vs-split.html</a>
+  </div>
+
+  <h2>چک‌لیست قبل از خرید/پروداکشن</h2>
+  <ol>
+    <li>ایمیج با فیکس CRLF بیلد و push شده</li>
+    <li>securityContext با ۱۰۱ فعال است و PVC قابل نوشتن است</li>
+    <li>DB schema اعمال شده</li>
+    <li>Redis و AMQP سالم‌اند</li>
+    <li>JWT درست تنظیم شده</li>
+    <li>برای محصول فروشی: مسیر Developer + لایسنس مناسب connections/cluster</li>
+  </ol>
+
+  <p class="card">
+    جزئیات تجربه بیلد محلی در فایل‌های
+    <code>fa-build-report.md</code> / <code>fa-build-report.html</code>
+    و راهنمای Compose در
+    <code>fa-docker-compose.html</code>
+    آمده است.
+  </p>
+</main>
+</body>
+</html>

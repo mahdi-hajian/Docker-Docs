@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>گزارش خروجی از ONLYOFFICE Docker-Docs</title>
+  <style>
+    :root {
+      --bg: #f7f4ef;
+      --card: #fffdf9;
+      --text: #1c1917;
+      --muted: #57534e;
+      --accent: #0f766e;
+      --border: #e7e5e4;
+      --code-bg: #1c1917;
+      --code-fg: #f5f5f4;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Vazirmatn", "Tahoma", "Segoe UI", sans-serif;
+      background: linear-gradient(180deg, #ecfeff 0%, var(--bg) 40%);
+      color: var(--text);
+      line-height: 1.8;
+    }
+    main {
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 4rem;
+    }
+    h1, h2, h3 { line-height: 1.4; color: #134e4a; }
+    h1 { font-size: 1.75rem; margin-bottom: 0.5rem; }
+    h2 { margin-top: 2.25rem; border-bottom: 2px solid var(--border); padding-bottom: 0.35rem; }
+    p, li { color: var(--text); }
+    .lead { color: var(--muted); font-size: 1.05rem; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.15rem;
+      margin: 1rem 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      background: var(--card);
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.55rem 0.7rem;
+      text-align: right;
+      vertical-align: top;
+    }
+    th { background: #ccfbf1; }
+    code, pre {
+      font-family: ui-monospace, Consolas, monospace;
+      direction: ltr;
+      text-align: left;
+    }
+    code {
+      background: #e7e5e4;
+      padding: 0.1rem 0.35rem;
+      border-radius: 4px;
+      font-size: 0.92em;
+    }
+    pre {
+      background: var(--code-bg);
+      color: var(--code-fg);
+      padding: 1rem;
+      border-radius: 10px;
+      overflow-x: auto;
+    }
+    pre code { background: transparent; color: inherit; padding: 0; }
+    a { color: var(--accent); }
+    .ok { color: #047857; font-weight: 700; }
+    .warn { color: #b45309; font-weight: 700; }
+    ul { padding-right: 1.2rem; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>خروجی گرفتن از ONLYOFFICE Docker-Docs — گزارش کار</h1>
+  <p class="lead">این صفحه خلاصه می‌کند از ریپوی Docker-Docs چطور ایمیج ساختیم، چه مشکلاتی پیش آمد، و چه تغییراتی اعمال شد تا stack محلی بالا بیاید.</p>
+
+  <h2>هدف</h2>
+  <ul>
+    <li>ساخت ایمیج‌های Docs برای Docker Compose و بعداً Kubernetes</li>
+    <li>اجرای non-root (کاربر <code>ds</code>، UID/GID <strong>101</strong>)</li>
+    <li>رفع خطاهای بیلد/اجرا روی ویندوز</li>
+    <li>فهم تفاوت Community / Developer (<code>-de</code>) و لایسنس</li>
+  </ul>
+
+  <h2>این ریپو چه می‌کند؟</h2>
+  <p>ایمیج رسمی یک‌تکه <code>onlyoffice/documentserver</code> را patch نمی‌کند. جریان بیلد:</p>
+  <ol>
+    <li>پایه: <code>fedora</code></li>
+    <li>دانلود و نصب RPM فقط‌آفیس</li>
+    <li>بسته‌بندی برای cluster / سرویس‌های جدا</li>
+    <li>اجرا با <code>USER ds</code> (non-root)</li>
+  </ol>
+
+  <table>
+    <thead>
+      <tr><th><code>PRODUCT_EDITION</code></th><th>پکیج RPM</th><th>معنی</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>خالی</td><td><code>onlyoffice-documentserver</code></td><td>Community</td></tr>
+      <tr><td><code>-de</code></td><td><code>onlyoffice-documentserver-de</code></td><td>Developer (تجاری)</td></tr>
+      <tr><td><code>-ee</code></td><td><code>onlyoffice-documentserver-ee</code></td><td>Enterprise (تجاری)</td></tr>
+    </tbody>
+  </table>
+  <p class="card">دانلود پکیج <code>-de</code> لایسنس کامل نمی‌دهد؛ برای فعال‌سازی کامل به <code>license.lic</code> نیاز است.</p>
+
+  <h2>کارهایی که انجام شد</h2>
+
+  <h3>۱) بیلد روی ویندوز</h3>
+  <ul>
+    <li>افزودن <code>build.ps1</code> (معادل <code>build.sh</code>)</li>
+    <li>Git Bash: <code>./build.sh</code></li>
+    <li>PowerShell: <code>.\build.ps1</code></li>
+  </ul>
+
+  <h3>۲) مشکل CRLF (<code>bash\r</code>)</h3>
+  <p><strong>علائم:</strong> Restart مداوم با پیام <code>env: 'bash\r': No such file or directory</code></p>
+  <p><strong>علت:</strong> CRLF ویندوز داخل entrypointهای لینوکسی</p>
+  <p><strong>اقدامات:</strong> تبدیل به LF، فایل <code>.gitattributes</code>، و در Dockerfile:</p>
+  <pre><code>RUN sed -i 's/\r$//' ...entrypoint... &amp;&amp; chmod +x ...</code></pre>
+  <p class="warn">اگر ایمیج خراب را push کنی، روی Kubernetes لینوکس هم همان خطا را می‌گیری. CRLF مشکل زمان بیلد است نه فقط اجرا روی ویندوز.</p>
+
+  <h3>۳) مشکل docker compose</h3>
+  <p><strong>علائم:</strong> نبودن <code>image</code>/<code>build</code> برای postgresql و metrics</p>
+  <p><strong>اقدامات روی compose:</strong></p>
+  <ul>
+    <li>افزودن <code>image</code> برای metrics و postgresql</li>
+    <li>اختیاری کردن example با profile</li>
+    <li>اصلاح healthcheck به <code>-U myuser -d mydb</code></li>
+    <li>تنظیم <code>EXAMPLE_HOST_PORT=docservice:8000</code> تا nginx بدون example بالا بماند</li>
+  </ul>
+
+  <h3>۴) نتیجه موفق</h3>
+  <ul>
+    <li class="ok">healthcheck = true</li>
+    <li class="ok">proxy روی پورت 80 healthy</li>
+    <li class="ok">داخل کانتینر: uid=101(ds)</li>
+    <li>هشدار نبودن license.lic برای -de طبیعی است</li>
+  </ul>
+
+  <h2>ایمیج‌ها</h2>
+  <table>
+    <thead>
+      <tr><th>ایمیج</th><th>نقش</th><th>در compose لوکال</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>docs-cluster-de</code></td><td>ایمیج یکپارچه</td><td>استفاده می‌شود</td></tr>
+      <tr><td><code>docs-proxy-de</code> و …</td><td>سازگاری Helm قدیمی</td><td>معمولاً unused</td></tr>
+      <tr><td><code>docs-postgresql</code></td><td>Postgres + schema</td><td>استفاده / در prod اختیاری</td></tr>
+      <tr><td><code>docs-metrics</code> / <code>docs-utils</code></td><td>متریک و ابزار</td><td>استفاده می‌شود</td></tr>
+    </tbody>
+  </table>
+  <p>روی K8s هم می‌توان همه نقش‌ها را با همان <code>docs-cluster-de</code> و args مختلف اجرا کرد؛ ایمیج‌های جدا اجباری نیستند.</p>
+
+  <h2>Postgres</h2>
+  <p>ایمیج مخصوص فقط shortcut است. Postgres معمولی (≥ ۱۲.۹) + یک‌بار اجرای <code>createdb.sql</code> کافی است. نسخه ۱۵ اجباری نیست.</p>
+
+  <h2>دستورات کلیدی</h2>
+  <pre><code>cd E:\github\Docker-Docs
+.\build.ps1
+docker compose up -d
+docker compose ps
+curl http://localhost/healthcheck
+docker compose exec docservice id</code></pre>
+  <p>آدرس: <a href="http://localhost">http://localhost</a> (نگاشت <code>80:8888</code>)</p>
+
+  <h2>گام بعدی Kubernetes</h2>
+  <ol>
+    <li>Push به رجیستری</li>
+    <li>Helm: Kubernetes-Docs</li>
+    <li><code>runAsUser/fsGroup: 101</code></li>
+    <li>لایسنس در صورت نیاز</li>
+    <li>Postgres/Redis/RabbitMQ + schema</li>
+  </ol>
+</main>
+</body>
+</html>

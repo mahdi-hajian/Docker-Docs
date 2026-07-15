@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>راهنمای Docker Compose — ONLYOFFICE Docker-Docs</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #475569;
+      --accent: #1d4ed8;
+      --border: #dbe3ef;
+      --code-bg: #0b1220;
+      --code-fg: #e2e8f0;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Vazirmatn", "Tahoma", "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, #dbeafe, var(--bg) 45%);
+      color: var(--text);
+      line-height: 1.85;
+    }
+    main { max-width: 900px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+    h1, h2, h3 { color: #1e3a8a; line-height: 1.35; }
+    h1 { font-size: 1.7rem; }
+    h2 { margin-top: 2rem; border-bottom: 2px solid var(--border); padding-bottom: 0.3rem; }
+    .lead { color: var(--muted); }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.2rem;
+      margin: 1rem 0;
+    }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; background: #fff; }
+    th, td { border: 1px solid var(--border); padding: 0.55rem 0.7rem; text-align: right; }
+    th { background: #dbeafe; }
+    code, pre { font-family: ui-monospace, Consolas, monospace; direction: ltr; text-align: left; }
+    code { background: #e2e8f0; padding: 0.1rem 0.35rem; border-radius: 4px; }
+    pre {
+      background: var(--code-bg);
+      color: var(--code-fg);
+      padding: 1rem;
+      border-radius: 10px;
+      overflow-x: auto;
+    }
+    pre code { background: transparent; color: inherit; padding: 0; }
+    ol, ul { padding-right: 1.2rem; }
+    .step { font-weight: 700; color: var(--accent); }
+  </style>
+</head>
+<body>
+<main>
+  <h1>راهنمای استفاده با Docker Compose</h1>
+  <p class="lead">مراحل بیلد و اجرای ONLYOFFICE Docs از ریپوی Docker-Docs روی سیستم محلی (ویندوز/لینوکس).</p>
+
+  <h2>پیش‌نیاز</h2>
+  <ul>
+    <li>Docker Desktop / Docker Engine</li>
+    <li>Docker Compose v2</li>
+    <li>حداقل چند گیگابایت RAM آزاد (ترجیحاً ۴GB+ فقط برای Docs)</li>
+    <li>فایل <code>.env</code> در ریشه پروژه</li>
+  </ul>
+
+  <h2>تنظیم <code>.env</code></h2>
+  <div class="card">
+    <p>نمونه برای Developer:</p>
+    <pre><code>ACCOUNT_NAME=onlyoffice
+PREFIX_NAME=docs
+PRODUCT_EDITION=-de
+RELEASE_VERSION=-9.4.1
+DOCKER_TAG=latest
+JWT_ENABLED=true
+JWT_HEADER=Authorization
+JWT_SECRET=secret</code></pre>
+    <p>برای Community مقدار <code>PRODUCT_EDITION</code> را خالی بگذار.</p>
+  </div>
+
+  <h2>گام ۱ — بیلد ایمیج‌ها</h2>
+  <p class="step">PowerShell:</p>
+  <pre><code>cd E:\github\Docker-Docs
+.\build.ps1</code></pre>
+  <p class="step">Git Bash:</p>
+  <pre><code>cd /e/github/Docker-Docs
+./build.sh</code></pre>
+  <p>خروجی مهم: <code>onlyoffice/docs-cluster-de:latest</code> و همچنین utils / metrics / postgresql.</p>
+
+  <h2>گام ۲ — اجرا</h2>
+  <pre><code>docker compose up -d
+docker compose ps
+curl http://localhost/healthcheck</code></pre>
+  <p>اگر همه چیز درست باشد، خروجی healthcheck باید <strong>true</strong> باشد و صفحه در <a href="http://localhost">http://localhost</a> باز شود.</p>
+
+  <h2>سرویس‌های compose</h2>
+  <table>
+    <thead>
+      <tr><th>سرویس</th><th>نقش</th><th>ایمیج</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>proxy</td><td>ورودی HTTP روی پورت ۸۰</td><td>docs-cluster-*</td></tr>
+      <tr><td>docservice</td><td>ادیتور / API</td><td>docs-cluster-*</td></tr>
+      <tr><td>converter</td><td>تبدیل فایل (قابل scale)</td><td>docs-cluster-*</td></tr>
+      <tr><td>adminpanel</td><td>پنل ادمین</td><td>docs-cluster-*</td></tr>
+      <tr><td>postgresql</td><td>دیتابیس (+ schema)</td><td>docs-postgresql</td></tr>
+      <tr><td>redis</td><td>کش/سشن</td><td>redis:7</td></tr>
+      <tr><td>rabbitmq</td><td>صف پیام</td><td>rabbitmq:3</td></tr>
+      <tr><td>metrics / utils</td><td>کمکی</td><td>docs-metrics / docs-utils</td></tr>
+    </tbody>
+  </table>
+
+  <h2>دستورات مفید</h2>
+  <pre><code># وضعیت
+docker compose ps
+
+# لاگ
+docker compose logs -f proxy docservice converter
+
+# چک non-root
+docker compose exec docservice id
+
+# scale converter
+docker compose up -d --scale converter=3
+
+# توقف
+docker compose down</code></pre>
+
+  <h2>فونت کاستوم</h2>
+  <ol>
+    <li>فایل‌های <code>.ttf</code> را در پوشه <code>fonts/</code> بگذار</li>
+    <li>دوباره بیلد کن (<code>build.ps1</code> / <code>build.sh</code>)</li>
+    <li>stack را بالا بیاور</li>
+  </ol>
+
+  <h2>عیب‌یابی رایج</h2>
+  <table>
+    <thead>
+      <tr><th>خطا</th><th>کار</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>bash\r</code></td>
+        <td>اسکریپت‌ها LF باشند / Dockerfile کار strip CRLF را داشته باشد و دوباره بیلد کن</td>
+      </tr>
+      <tr>
+        <td><code>neither an image nor a build</code></td>
+        <td>برای postgresql و metrics فیلد <code>image</code> تعریف شده باشد</td>
+      </tr>
+      <tr>
+        <td>proxy روی upstream example می‌میرد</td>
+        <td><code>EXAMPLE_HOST_PORT</code> را به هاست موجود بده یا example را بالا بیاور</td>
+      </tr>
+      <tr>
+        <td><code>license.lic</code> ENOENT</td>
+        <td>برای -de بدون لایسنس طبیعی است؛ سرویس می‌تواند بالا باشد ولی کامل/cluster تجاری محدود است</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>نکته ایمیج‌های unused</h2>
+  <p class="card">
+    ایمیج‌هایی مثل <code>docs-proxy-de</code> / <code>docs-docservice-de</code> / <code>docs-converter-de</code>
+    ممکن است ساخته شوند ولی در compose استفاده نشوند، چون همه نقش‌ها از
+    <code>docs-cluster-de</code> می‌آیند و نقش با <code>command</code>/<code>entrypoint</code> عوض می‌شود.
+    این به معنی «روی Kubernetes حتماً لازم‌اند» نیست؛ در Helm هم می‌توان همه را به cluster برد.
+    توضیح تخصصی کامل:
+    <a href="./fa-images-cluster-vs-split.html">fa-images-cluster-vs-split.html</a>
+  </p>
+
+  <h2>پورت</h2>
+  <p>پیش‌فرض نگاشت: <code>80:8888</code> → مرورگر روی <strong>http://localhost</strong></p>
+</main>
+</body>
+</html>

@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ایمیج cluster در برابر ایمیج‌های جدا — توضیح تخصصی</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #475569;
+      --accent: #0f766e;
+      --warn: #b45309;
+      --border: #e2e8f0;
+      --code-bg: #0f172a;
+      --code-fg: #e2e8f0;
+      --ok-bg: #ecfdf5;
+      --bad-bg: #fff7ed;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Vazirmatn", "Tahoma", "Segoe UI", sans-serif;
+      background: linear-gradient(180deg, #ccfbf1 0%, var(--bg) 28%);
+      color: var(--text);
+      line-height: 1.9;
+    }
+    main { max-width: 960px; margin: 0 auto; padding: 2rem 1.2rem 4rem; }
+    h1, h2, h3 { color: #115e59; line-height: 1.35; }
+    h1 { font-size: 1.65rem; }
+    h2 { margin-top: 2.2rem; border-bottom: 2px solid var(--border); padding-bottom: 0.35rem; }
+    h3 { margin-top: 1.4rem; color: #0f766e; }
+    .lead { color: var(--muted); font-size: 1.05rem; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.15rem;
+      margin: 1rem 0;
+    }
+    .wrong { background: var(--bad-bg); border-color: #fed7aa; }
+    .right { background: var(--ok-bg); border-color: #a7f3d0; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; background: #fff; }
+    th, td { border: 1px solid var(--border); padding: 0.55rem 0.7rem; text-align: right; vertical-align: top; }
+    th { background: #ccfbf1; }
+    code, pre { font-family: ui-monospace, Consolas, monospace; direction: ltr; text-align: left; }
+    code { background: #e2e8f0; padding: 0.08rem 0.35rem; border-radius: 4px; font-size: 0.92em; }
+    pre {
+      background: var(--code-bg);
+      color: var(--code-fg);
+      padding: 1rem;
+      border-radius: 10px;
+      overflow-x: auto;
+    }
+    pre code { background: transparent; color: inherit; padding: 0; }
+    ol, ul { padding-right: 1.25rem; }
+    .diagram {
+      direction: ltr;
+      text-align: left;
+      white-space: pre;
+      font-family: ui-monospace, Consolas, monospace;
+      background: #0f172a;
+      color: #a7f3d0;
+      padding: 1rem;
+      border-radius: 10px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>ایمیج‌های جدا در برابر <code>docs-cluster</code></h1>
+  <p class="lead">توضیح تخصصی: فرق ایمیج و کانتینر، کی ایمیج جدا لازم است، و چرا Compose و Kubernetes هر دو می‌توانند با یک ایمیج کار کنند.</p>
+
+  <h2>۰) فرق ایمیج و کانتینر (دقیق)</h2>
+  <table>
+    <thead><tr><th>مفهوم</th><th>چیست؟</th><th>مثال</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Image</strong></td><td>بستهٔ فقط‌خواندنی روی دیسک/رجیستری</td><td><code>onlyoffice/docs-cluster-de:latest</code></td></tr>
+      <tr><td><strong>Container / Service / Pod</strong></td><td>نمونهٔ در حال اجرا از روی یک ایمیج</td><td>سرویس compose به نام <code>docservice</code></td></tr>
+    </tbody>
+  </table>
+  <p class="card">یک ایمیج می‌تواند پایهٔ چند کانتینر با نقش متفاوت باشد. چند کانتینر جدا ≠ چند ایمیج جدا.</p>
+  <h3>جدول ایمیج‌ها</h3>
+  <table>
+    <thead><tr><th>ایمیج</th><th>محتوا</th><th>پیش‌فرض شروع</th><th>اجباری؟</th></tr></thead>
+    <tbody>
+      <tr><td><code>docs-cluster-*</code></td><td>کل فایل‌سیستم Docs</td><td>entrypoint عمومی</td><td><strong>اصلی</strong></td></tr>
+      <tr><td><code>docs-proxy-*</code></td><td>همان محتوا</td><td>entrypoint پروکسی</td><td>اختیاری (مستعار)</td></tr>
+      <tr><td><code>docs-docservice-*</code></td><td>همان محتوا</td><td>CMD=docservice</td><td>اختیاری (مستعار)</td></tr>
+      <tr><td><code>docs-converter-*</code></td><td>همان محتوا</td><td>CMD=converter</td><td>اختیاری (مستعار)</td></tr>
+      <tr><td>utils / metrics / postgresql</td><td>نقش واقعاً متفاوت</td><td>مخصوص خودشان</td><td>جدا از ادیتور</td></tr>
+    </tbody>
+  </table>
+  <h3>جدول کانتینرهای Compose این ریپو</h3>
+  <table>
+    <thead><tr><th>کانتینر</th><th>کار</th><th>ایمیج</th><th>انتخاب نقش</th></tr></thead>
+    <tbody>
+      <tr><td><code>proxy</code></td><td>Nginx لبه</td><td><code>docs-cluster-*</code></td><td><code>entrypoint: proxy-docker-entrypoint.sh</code></td></tr>
+      <tr><td><code>docservice</code></td><td>ادیتور/API</td><td><code>docs-cluster-*</code></td><td><code>command: [docservice]</code></td></tr>
+      <tr><td><code>converter</code></td><td>تبدیل فایل</td><td><code>docs-cluster-*</code></td><td><code>command: [converter]</code></td></tr>
+      <tr><td><code>adminpanel</code></td><td>ادمین</td><td><code>docs-cluster-*</code></td><td><code>command: [adminpanel]</code></td></tr>
+    </tbody>
+  </table>
+  <p>به همین دلیل <code>docs-proxy-de</code> و مشابهش اغلب Unused هستند؛ کانتینرها از <code>docs-cluster-de</code> اجرا می‌شوند.</p>
+  <h3>جدول Kubernetes</h3>
+  <table>
+    <thead><tr><th>Deployment</th><th>Pod جدا؟</th><th>repository ایمیج جدا؟</th></tr></thead>
+    <tbody>
+      <tr><td>proxy / docservice / converter</td><td>بله</td><td>خیر (می‌تواند همان cluster باشد)</td></tr>
+    </tbody>
+  </table>
+
+  <h2>۱) سوءتفاهم رایج</h2>
+  <div class="card wrong">
+    <strong>جملهٔ اشتباه:</strong>
+    <p>«در Docker Compose ایمیج‌های جدا لازم نیست، ولی در Kubernetes لازم است.»</p>
+  </div>
+  <div class="card right">
+    <strong>جملهٔ درست:</strong>
+    <p>
+      نه Compose و نه Kubernetes از نظر فنی مجبور به ایمیج‌های جدا نیستند.
+      فرق در <strong>قرارداد پیش‌فرض فایل اجرا</strong> است:
+    </p>
+    <ul>
+      <li><code>docker-compose.yml</code> این ریپو از اول روی یک ایمیج چندنقشی (<code>docs-cluster-*</code>) نوشته شده است.</li>
+      <li>Helm chart رسمی به‌صورت پیش‌فرض (برای سازگاری عقب‌رو) نام‌های جدا می‌گذارد؛ ولی اجازه می‌دهد همه را به <code>docs-cluster-*</code> ببری.</li>
+    </ul>
+    <p>پس موضوع «Compose در برابر K8s» نیست؛ موضوع این است: <strong>نقش پروسس چطور انتخاب می‌شود</strong> و <strong>tooling چه نام ایمیجی را می‌کشد</strong>.</p>
+  </div>
+
+  <h2>۲) معماری منطقی (برای هر دو محیط یکی است)</h2>
+  <p>تفکیک زیر، تفکیک <strong>نقش پروسس / workload</strong> است نه الزاماً تفکیک فایل ایمیج:</p>
+  <table>
+    <thead>
+      <tr><th>نقش</th><th>مسئولیت</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>proxy</td><td>Nginx لبه، مسیریابی به سرویس‌های داخلی</td></tr>
+      <tr><td>docservice</td><td>هستهٔ ادیتور، API، همکاری هم‌زمان</td></tr>
+      <tr><td>converter</td><td>تبدیل فرمت / CPU-bound؛ معمولاً بیشترین scale</td></tr>
+      <tr><td>adminpanel</td><td>پنل مدیریت (editionهای تجاری)</td></tr>
+    </tbody>
+  </table>
+  <div class="diagram">Client → proxy → docservice
+               ↘ converter   (معمولاً از مسیر AMQP)
+         Redis / PostgreSQL / RabbitMQ</div>
+  <p>Compose و Kubernetes هر دو همین توپولوژی را می‌سازند. تفاوت orchestration است، نه اجبار به تگ ایمیج جدا.</p>
+
+  <h2>۳) واقعیت Dockerfile: ایمیج‌های جدا «مستعار نقش» هستند</h2>
+  <p>تارگت اصلی runtime (<code>docs</code> → تگ <code>docs-cluster-*</code>) تقریباً همه فایل‌های لازم را دارد. سپس:</p>
+  <pre><code>FROM docs AS proxy
+ENTRYPOINT ["proxy-docker-entrypoint.sh"]
+
+FROM docs AS docservice
+CMD ["docservice"]
+
+FROM docs AS converter
+CMD ["converter"]</code></pre>
+  <p>کامنت رسمی ریپو:</p>
+  <div class="card">
+    No additional files or configuration are added here; the image is identical to <code>docs</code> except for the default execution mode.
+  </div>
+  <table>
+    <thead>
+      <tr><th>ایمیج</th><th>محتوا نسبت به cluster</th><th>تفاوت واقعی</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>docs-cluster-*</code></td><td>کامل</td><td>entrypoint عمومی + CMD پیش‌فرض نقش پیش‌فرض</td></tr>
+      <tr><td><code>docs-proxy-*</code></td><td>همان لایه‌ها</td><td>فقط ENTRYPOINT پیش‌فرض proxy</td></tr>
+      <tr><td><code>docs-docservice-*</code></td><td>همان لایه‌ها</td><td>فقط CMD پیش‌فرض docservice</td></tr>
+      <tr><td><code>docs-converter-*</code></td><td>همان لایه‌ها</td><td>فقط CMD پیش‌فرض converter</td></tr>
+    </tbody>
+  </table>
+  <p><strong>هیچ باینری مخصوص کوبر داخل ایمیج جدا نیست که در cluster نباشد.</strong> اندازهٔ یکسان (~۴.۹GB) در Desktop همین را نشان می‌دهد.</p>
+
+  <h2>۴) Docker Compose این ریپو چه می‌کند؟</h2>
+  <pre><code>proxy:
+  image: .../docs-cluster-de:...
+  entrypoint: ["proxy-docker-entrypoint.sh"]
+
+docservice:
+  image: .../docs-cluster-de:...
+  command: ["docservice"]
+
+converter:
+  image: .../docs-cluster-de:...
+  command: ["converter"]</code></pre>
+  <p>یعنی:</p>
+  <ol>
+    <li>همه از یک repository/tag می‌آیند.</li>
+    <li>نقش با override سطح سرویس تعیین می‌شود.</li>
+  </ol>
+  <p>نتیجه در Docker Desktop: <code>docs-cluster-de</code> در حال استفاده؛ سه تگ جدا <strong>unused</strong>.</p>
+  <p><strong>Unused</strong> = «الان هیچ کانتینری به این tag اشاره نمی‌کند» — نه اینکه «روی کوبر حتماً لازم‌اند».</p>
+
+  <h3>چرا این طراحی برای Compose منطقی است؟</h3>
+  <ul>
+    <li>یک منبع حقیقت برای لوکال</li>
+    <li>overrideی <code>command</code> در Compose طبیعی است</li>
+    <li>مدیریت تگ/دیسک ساده‌تر</li>
+  </ul>
+  <h3>آیا Compose می‌تواند از ایمیج جدا استفاده کند؟</h3>
+  <p>بله؛ فقط این فایل طوری نوشته نشده. اگر image را به <code>docs-docservice-de</code> عوض کنی باز هم کار می‌کند چون محتوا یکی است.</p>
+
+  <h2>۵) Kubernetes / Helm چه می‌کند؟</h2>
+
+  <h3>۵.۱ نیاز واقعی موتور Kubernetes</h3>
+  <p>K8s به «سه‌تا فایل ایمیج» نیاز ندارد. نیاز واقعی‌اش:</p>
+  <ul>
+    <li>چند Workload جدا برای lifecycle و scale جدا</li>
+    <li>هر Pod با command/args یا ENTRYPOINT مناسب</li>
+    <li>Service، PVC، SecurityContext، probe، HPA و …</li>
+  </ul>
+  <p>کاملاً معتبر است که سه Deployment داشته باشی و هر سه <code>image: docs-cluster-de:9.4.1</code> باشند و فقط args فرق کند — عین مدل Compose.</p>
+
+  <h3>۵.۲ رفتار پیش‌فرض Helm chart رسمی</h3>
+  <p>Chart <a href="https://github.com/ONLYOFFICE/Kubernetes-Docs">Kubernetes-Docs</a> به‌صورت تاریخی repository جدا دارد، مثلاً:</p>
+  <ul>
+    <li><code>docs-docservice-de</code></li>
+    <li><code>docs-proxy-de</code></li>
+    <li><code>docs-converter-de</code></li>
+  </ul>
+  <p>دلیل مستند خود chart:</p>
+  <div class="card">
+    kept for <strong>backward compatibility</strong>. You can use <code>onlyoffice/docs-cluster-de</code> instead.
+  </div>
+  <p>
+    یعنی پیش‌فرض Helm برای نشکستن آپگریدهای قدیمی نام جدا می‌گذارد؛
+    نه اینکه kubelet بدون ایمیج جدا نتواند کار کند.
+  </p>
+
+  <h3>۵.۳ چه وقتی «در کوبر سه‌تا لازم است» درست است؟</h3>
+  <ol>
+    <li>values پیش‌فرض Helm را عوض نمی‌کنی → باید همان نام‌ها در رجیستری موجود باشند.</li>
+    <li>سیاست سازمانی Image Policy روی نام repository جدا سخت‌گیر است.</li>
+    <li>CI/CD برای هر سرویس digest جدا pin می‌کند (حتی اگر محتوا یکی باشد).</li>
+    <li>نمی‌خواهی در PodSpec مقدار command را override کنی و به ENTRYPOINT/CMD پیش‌فرض ایمیج تکیه می‌کنی.</li>
+  </ol>
+  <p>در همهٔ این حالت‌ها نیاز، <strong>تطابق با قرارداد tooling/عملیات</strong> است نه محدودیت معماری Docs.</p>
+
+  <h3>۵.۴ چه وقتی در کوبر هم نیاز نیست؟</h3>
+  <pre><code>docservice.image.repository: registry/onlyoffice/docs-cluster-de
+proxy.image.repository:      registry/onlyoffice/docs-cluster-de
+converter.image.repository:  registry/onlyoffice/docs-cluster-de</code></pre>
+  <p>با override بالا (و اطمینان از تنظیم صحیح entrypoint/args در chart)، فقط یک ایمیج در رجیستری کافی است.</p>
+
+  <h2>۶) جدول تصمیم‌گیری</h2>
+  <table>
+    <thead>
+      <tr><th>سؤال</th><th>جواب</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>از نظر باینری سه‌تا ایمیج جدا لازم است؟</td><td><strong>خیر</strong></td></tr>
+      <tr><td>از نظر معماری چند پروسس/Deployment جدا لازم است؟</td><td><strong>بله</strong></td></tr>
+      <tr><td>چرا Compose این ریپو سه‌تا لازم ندارد؟</td><td>نقش را با command/entrypoint روی cluster می‌دهد</td></tr>
+      <tr><td>چرا Helm انگار سه‌تا لازم دارد؟</td><td>پیش‌فرض نام repository جداست (سازگاری عقب‌رو)</td></tr>
+      <tr><td>کی هر سه را push کنی؟</td><td>وقتی values روی نام‌های جدا می‌ماند</td></tr>
+      <tr><td>کی فقط cluster کافی است؟</td><td>Compose این ریپو؛ یا Helm با override به cluster</td></tr>
+      <tr><td>Unused یعنی چه؟</td><td>الان هیچ کانتینری آن tag را اجرا نمی‌کند</td></tr>
+    </tbody>
+  </table>
+
+  <h2>۷) قیاس مفهومی</h2>
+  <pre><code>node dist/index.js proxy
+node dist/index.js docservice
+node dist/index.js converter</code></pre>
+  <ul>
+    <li>یک artifact + آرگومان‌های مختلف = مدل <code>docs-cluster</code> + Compose</li>
+    <li>سه تگ که فقط CMD پیش‌فرض فرق دارد = مدل <code>docs-*-de</code> + defaults Helm</li>
+  </ul>
+  <p>از نظر runtime تقریباً معادل‌اند؛ دومی قرارداد عملیات/نام‌گذاری است.</p>
+
+  <h2>۸) توصیه عملی</h2>
+  <h3>لوکال / Compose</h3>
+  <ul>
+    <li>روی <code>docs-cluster-*</code> بمان</li>
+    <li>تگ‌های جدا را در صورت کمبود فضا می‌توانی حذف کنی</li>
+  </ul>
+  <h3>Kubernetes</h3>
+  <ol>
+    <li><strong>ترجیح:</strong> یک ایمیج cluster در رجیستری + override همه repositoryها</li>
+    <li><strong>اگر Helm دست‌نخورده با defaults می‌ماند:</strong> هر سه تگ جدا را هم push کن</li>
+    <li>همیشه جدا نگه دار: چند Deployment برای scale ≠ چند repository ایمیج (اختیاری)</li>
+  </ol>
+
+  <h2>۹) جمع‌بندی نهایی</h2>
+  <div class="card right">
+    <p>
+      Compose به ایمیج جدا «نیاز ندارد» چون نقش را override می‌کند.
+      Kubernetes هم ذاتاً به ایمیج جدا «نیاز ندارد»؛ فقط Helm به‌صورت پیش‌فرض نام جدا می‌خواهد مگر values را عوض کنی.
+    </p>
+    <p>
+      <strong>نیاز واقعی همیشه:</strong> چند workload با نقش‌های متفاوت.
+      <strong>نه لزوماً:</strong> چند فایل ایمیج متفاوت.
+    </p>
+  </div>
+
+  <p class="card">
+    مرتبط:
+    <code>fa-build-report.html</code> ،
+    <code>fa-docker-compose.html</code> ،
+    <code>fa-kubernetes-helm.html</code>
+  </p>
+</main>
+</body>
+</html>
