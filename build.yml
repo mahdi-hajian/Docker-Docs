@@ -42,6 +42,7 @@ services:
       context: .
       dockerfile: ${DOCKERFILE}
       target: metrics
+    image: ${ACCOUNT_NAME}/${PREFIX_NAME}-metrics:${DOCKER_TAG}
     expose:
       - '8125'
       - '8126'
@@ -49,4 +50,6 @@ services:
   postgresql:
     build:
       context: .
+      dockerfile: ${DOCKERFILE}
       target: db
+    image: ${ACCOUNT_NAME}/${PREFIX_NAME}-postgresql:${DOCKER_TAG}

@@ -5,7 +5,9 @@ services:
     entrypoint: ["proxy-docker-entrypoint.sh"]
     environment:
       - DOCSERVICE_HOST_PORT=docservice:8000
-      - EXAMPLE_HOST_PORT=example:3000
+      - ADMINPANEL_HOST_PORT=adminpanel:9000
+      # example image is optional; point to an existing host so nginx can start
+      - EXAMPLE_HOST_PORT=docservice:8000
     stdin_open: true
     restart: always
     ports:
@@ -134,12 +136,15 @@ services:
 
   metrics:
     container_name: metrics
+    image: ${ACCOUNT_NAME}/${PREFIX_NAME}-metrics:${DOCKER_TAG}
     expose:
       - '8125'
       - '8126'
 
   example:
-    image: ${COMPANY_NAME}/${PREFIX_NAME}-example:${DOCKER_TAG}
+    profiles:
+      - example
+    image: ${ACCOUNT_NAME}/${PREFIX_NAME}-example:${DOCKER_TAG}
     container_name: example
     environment:
       - JWT_ENABLED=${JWT_ENABLED}
@@ -189,6 +194,7 @@ services:
 
   postgresql:
     container_name: postgresql
+    image: ${ACCOUNT_NAME}/${PREFIX_NAME}-postgresql:${DOCKER_TAG}
     environment:
       - POSTGRES_DB=mydb
       - POSTGRES_USER=myuser
@@ -199,7 +205,7 @@ services:
     volumes:
       - postgresql_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U onlyoffice"]
+      test: ["CMD-SHELL", "pg_isready -U myuser -d mydb"]
       interval: 10s
       retries: 3
       start_period: 10s
