@@ -1,5 +1,8 @@
 # Handoff for next AI — ONLYOFFICE Docker-Docs local customizations
 
+> **Full dump of everything done/known:** see [`COMPLETE-KNOWLEDGE.md`](./COMPLETE-KNOWLEDGE.md) (Persian, comprehensive).  
+> This file is the shorter English-oriented handoff; prefer `COMPLETE-KNOWLEDGE.md` when context is missing.
+
 **Audience:** next Cursor/AI chat tab  
 **Purpose:** understand what was changed *on top of* upstream ONLYOFFICE/Docker-Docs, why, and what still works / still missing — without re-discovering the same issues.
 

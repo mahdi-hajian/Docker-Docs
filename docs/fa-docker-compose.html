@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>راهنمای Docker Compose — ONLYOFFICE Docker-Docs</title>
+  <title>راهنمای Docker Compose — سرویس‌های اجباری و اختیاری</title>
   <style>
     :root {
       --bg: #f4f7fb;
@@ -14,6 +14,8 @@
       --border: #dbe3ef;
       --code-bg: #0b1220;
       --code-fg: #e2e8f0;
+      --req: #047857;
+      --opt: #b45309;
     }
     * { box-sizing: border-box; }
     body {
@@ -23,7 +25,7 @@
       color: var(--text);
       line-height: 1.85;
     }
-    main { max-width: 900px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+    main { max-width: 980px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
     h1, h2, h3 { color: #1e3a8a; line-height: 1.35; }
     h1 { font-size: 1.7rem; }
     h2 { margin-top: 2rem; border-bottom: 2px solid var(--border); padding-bottom: 0.3rem; }
@@ -35,8 +37,8 @@
       padding: 1rem 1.2rem;
       margin: 1rem 0;
     }
-    table { width: 100%; border-collapse: collapse; margin: 1rem 0; background: #fff; }
-    th, td { border: 1px solid var(--border); padding: 0.55rem 0.7rem; text-align: right; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; background: #fff; font-size: 0.95rem; }
+    th, td { border: 1px solid var(--border); padding: 0.55rem 0.65rem; text-align: right; vertical-align: top; }
     th { background: #dbeafe; }
     code, pre { font-family: ui-monospace, Consolas, monospace; direction: ltr; text-align: left; }
     code { background: #e2e8f0; padding: 0.1rem 0.35rem; border-radius: 4px; }
@@ -48,129 +50,242 @@
       overflow-x: auto;
     }
     pre code { background: transparent; color: inherit; padding: 0; }
+    .req { color: var(--req); font-weight: 700; }
+    .opt { color: var(--opt); font-weight: 700; }
+    .badge-req { background: #d1fae5; color: #065f46; padding: 0.1rem 0.45rem; border-radius: 999px; font-size: 0.85rem; }
+    .badge-opt { background: #ffedd5; color: #9a3412; padding: 0.1rem 0.45rem; border-radius: 999px; font-size: 0.85rem; }
     ol, ul { padding-right: 1.2rem; }
-    .step { font-weight: 700; color: var(--accent); }
+    a { color: var(--accent); }
   </style>
 </head>
 <body>
 <main>
-  <h1>راهنمای استفاده با Docker Compose</h1>
-  <p class="lead">مراحل بیلد و اجرای ONLYOFFICE Docs از ریپوی Docker-Docs روی سیستم محلی (ویندوز/لینوکس).</p>
-
-  <h2>پیش‌نیاز</h2>
-  <ul>
-    <li>Docker Desktop / Docker Engine</li>
-    <li>Docker Compose v2</li>
-    <li>حداقل چند گیگابایت RAM آزاد (ترجیحاً ۴GB+ فقط برای Docs)</li>
-    <li>فایل <code>.env</code> در ریشه پروژه</li>
-  </ul>
-
-  <h2>تنظیم <code>.env</code></h2>
-  <div class="card">
-    <p>نمونه برای Developer:</p>
-    <pre><code>ACCOUNT_NAME=onlyoffice
-PREFIX_NAME=docs
-PRODUCT_EDITION=-de
-RELEASE_VERSION=-9.4.1
-DOCKER_TAG=latest
-JWT_ENABLED=true
-JWT_HEADER=Authorization
-JWT_SECRET=secret</code></pre>
-    <p>برای Community مقدار <code>PRODUCT_EDITION</code> را خالی بگذار.</p>
-  </div>
-
-  <h2>گام ۱ — بیلد ایمیج‌ها</h2>
-  <p class="step">PowerShell:</p>
-  <pre><code>cd E:\github\Docker-Docs
-.\build.ps1</code></pre>
-  <p class="step">Git Bash:</p>
-  <pre><code>cd /e/github/Docker-Docs
-./build.sh</code></pre>
-  <p>خروجی مهم: <code>onlyoffice/docs-cluster-de:latest</code> و همچنین utils / metrics / postgresql.</p>
-
-  <h2>گام ۲ — اجرا</h2>
-  <pre><code>docker compose up -d
-docker compose ps
-curl http://localhost/healthcheck</code></pre>
-  <p>اگر همه چیز درست باشد، خروجی healthcheck باید <strong>true</strong> باشد و صفحه در <a href="http://localhost">http://localhost</a> باز شود.</p>
-
-  <h2>سرویس‌های compose</h2>
-  <table>
-    <thead>
-      <tr><th>سرویس</th><th>نقش</th><th>ایمیج</th></tr>
-    </thead>
-    <tbody>
-      <tr><td>proxy</td><td>ورودی HTTP روی پورت ۸۰</td><td>docs-cluster-*</td></tr>
-      <tr><td>docservice</td><td>ادیتور / API</td><td>docs-cluster-*</td></tr>
-      <tr><td>converter</td><td>تبدیل فایل (قابل scale)</td><td>docs-cluster-*</td></tr>
-      <tr><td>adminpanel</td><td>پنل ادمین</td><td>docs-cluster-*</td></tr>
-      <tr><td>postgresql</td><td>دیتابیس (+ schema)</td><td>docs-postgresql</td></tr>
-      <tr><td>redis</td><td>کش/سشن</td><td>redis:7</td></tr>
-      <tr><td>rabbitmq</td><td>صف پیام</td><td>rabbitmq:3</td></tr>
-      <tr><td>metrics / utils</td><td>کمکی</td><td>docs-metrics / docs-utils</td></tr>
-    </tbody>
-  </table>
-
-  <h2>دستورات مفید</h2>
-  <pre><code># وضعیت
-docker compose ps
-
-# لاگ
-docker compose logs -f proxy docservice converter
-
-# چک non-root
-docker compose exec docservice id
-
-# scale converter
-docker compose up -d --scale converter=3
-
-# توقف
-docker compose down</code></pre>
-
-  <h2>فونت کاستوم</h2>
-  <ol>
-    <li>فایل‌های <code>.ttf</code> را در پوشه <code>fonts/</code> بگذار</li>
-    <li>دوباره بیلد کن (<code>build.ps1</code> / <code>build.sh</code>)</li>
-    <li>stack را بالا بیاور</li>
-  </ol>
-
-  <h2>عیب‌یابی رایج</h2>
-  <table>
-    <thead>
-      <tr><th>خطا</th><th>کار</th></tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><code>bash\r</code></td>
-        <td>اسکریپت‌ها LF باشند / Dockerfile کار strip CRLF را داشته باشد و دوباره بیلد کن</td>
-      </tr>
-      <tr>
-        <td><code>neither an image nor a build</code></td>
-        <td>برای postgresql و metrics فیلد <code>image</code> تعریف شده باشد</td>
-      </tr>
-      <tr>
-        <td>proxy روی upstream example می‌میرد</td>
-        <td><code>EXAMPLE_HOST_PORT</code> را به هاست موجود بده یا example را بالا بیاور</td>
-      </tr>
-      <tr>
-        <td><code>license.lic</code> ENOENT</td>
-        <td>برای -de بدون لایسنس طبیعی است؛ سرویس می‌تواند بالا باشد ولی کامل/cluster تجاری محدود است</td>
-      </tr>
-    </tbody>
-  </table>
-
-  <h2>نکته ایمیج‌های unused</h2>
-  <p class="card">
-    ایمیج‌هایی مثل <code>docs-proxy-de</code> / <code>docs-docservice-de</code> / <code>docs-converter-de</code>
-    ممکن است ساخته شوند ولی در compose استفاده نشوند، چون همه نقش‌ها از
-    <code>docs-cluster-de</code> می‌آیند و نقش با <code>command</code>/<code>entrypoint</code> عوض می‌شود.
-    این به معنی «روی Kubernetes حتماً لازم‌اند» نیست؛ در Helm هم می‌توان همه را به cluster برد.
-    توضیح تخصصی کامل:
-    <a href="./fa-images-cluster-vs-split.html">fa-images-cluster-vs-split.html</a>
+  <h1>Docker Compose — چه چیزی بالا می‌آید؟ اجباری یا اختیاری؟</h1>
+  <p class="lead">
+    این صفحه فقط برای اجرای لوکال با <code>docker compose</code> است.
+    هدف: بدانی هر سرویس به چه دردی می‌خورد، کدام بدون آن Docs کار نمی‌کند، و کدام را می‌شود حذف کرد.
   </p>
 
-  <h2>پورت</h2>
-  <p>پیش‌فرض نگاشت: <code>80:8888</code> → مرورگر روی <strong>http://localhost</strong></p>
+  <div class="card">
+    <strong>لیست ایمیج‌های رجیستری تو (نمونه):</strong>
+    <pre><code>repo.mohaymen.ir:3060/starrelease/onlyoffice/docs-cluster-de:none-root
+repo.mohaymen.ir:3060/starrelease/onlyoffice/docs-proxy-de:none-root
+repo.mohaymen.ir:3060/starrelease/onlyoffice/docs-docservice-de:none-root
+repo.mohaymen.ir:3060/starrelease/onlyoffice/docs-converter-de:none-root
+repo.mohaymen.ir:3060/starrelease/onlyoffice/docs-utils:none-root
+repo.mohaymen.ir:3060/starrelease/onlyoffice/docs-metrics:none-root
+repo.mohaymen.ir:3060/starrelease/onlyoffice/docs-postgresql:none-root</code></pre>
+  </div>
+
+  <h2>۱) فرق مهم: ایمیج ≠ سرویس/کانتینر</h2>
+  <ul>
+    <li><strong>ایمیج</strong> = فایل روی رجیستری (مثل <code>docs-cluster-de</code>)</li>
+    <li><strong>سرویس Compose</strong> = کانتینر در حال اجرا با یک نقش مشخص (مثل <code>docservice</code>)</li>
+  </ul>
+  <p>
+    در Compose این ریپو، سرویس‌های Docs معمولاً همه از <strong>یک ایمیج</strong>
+    (<code>docs-cluster-de</code>) بالا می‌آیند و فقط <code>command</code>/<code>entrypoint</code> فرق می‌کند.
+  </p>
+
+  <h2>۲) سرویس‌هایی که Compose بالا می‌آورد — اجباری / اختیاری</h2>
+
+  <h3>الف) هسته Docs — بدون این‌ها ادیتور کار نمی‌کند</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>سرویس Compose</th>
+        <th>وضعیت</th>
+        <th>به چه درد می‌خورد؟</th>
+        <th>ایمیج پیشنهادی تو</th>
+        <th>اگر نباشد چه می‌شود؟</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>proxy</code></td>
+        <td><span class="badge-req">اجباری</span></td>
+        <td>ورودی وب (پورت ۸۰). Nginx جلوی بقیه سرویس‌ها می‌ایستد و درخواست را پخش می‌کند.</td>
+        <td><code>docs-cluster-de:none-root</code><br/>(با entrypoint پروکسی)<br/>یا <code>docs-proxy-de:none-root</code></td>
+        <td>از بیرون به Docs دسترسی نداری.</td>
+      </tr>
+      <tr>
+        <td><code>docservice</code></td>
+        <td><span class="badge-req">اجباری</span></td>
+        <td>قلب سیستم: باز کردن سند، API، همکاری هم‌زمان، وب‌سوکت ادیتور.</td>
+        <td><code>docs-cluster-de:none-root</code><br/>+ <code>command: [docservice]</code><br/>یا <code>docs-docservice-de:none-root</code></td>
+        <td>ادیتور بالا نمی‌آید / healthcheck خراب است.</td>
+      </tr>
+      <tr>
+        <td><code>converter</code></td>
+        <td><span class="badge-req">اجباری برای کار واقعی</span></td>
+        <td>تبدیل فرمت فایل (DOCX↔PDF و …). کارهای سنگین CPU.</td>
+        <td><code>docs-cluster-de:none-root</code><br/>+ <code>command: [converter]</code><br/>یا <code>docs-converter-de:none-root</code></td>
+        <td>باز کردن بعضی فرمت‌ها / تبدیل / ذخیرهٔ برخی عملیات می‌شکند.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>ب) زیرساخت داده — در Compose داخل خود فایل آمده (برای راحتی لوکال)</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>سرویس Compose</th>
+        <th>وضعیت در این ریپو</th>
+        <th>به چه درد می‌خورد؟</th>
+        <th>ایمیج</th>
+        <th>اگر نباشد؟</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>postgresql</code></td>
+        <td><span class="badge-req">اجباری</span></td>
+        <td>ذخیرهٔ وضعیت اسناد/سشن‌های سمت سرور. باید schema فقط‌آفیس را داشته باشد.</td>
+        <td><code>docs-postgresql:none-root</code><br/>یا Postgres معمولی + <code>createdb.sql</code></td>
+        <td>docservice بالا نمی‌آید یا مدام خطا می‌دهد.</td>
+      </tr>
+      <tr>
+        <td><code>redis</code></td>
+        <td><span class="badge-req">اجباری</span></td>
+        <td>کش و هماهنگی وضعیت بین سرویس‌ها.</td>
+        <td><code>redis:7</code> (رسمی، از Docker Hub)</td>
+        <td>سرویس‌ها fail می‌شوند.</td>
+      </tr>
+      <tr>
+        <td><code>rabbitmq</code></td>
+        <td><span class="badge-req">اجباری</span></td>
+        <td>صف پیام بین docservice و converter.</td>
+        <td><code>rabbitmq:3</code> (رسمی)</td>
+        <td>تبدیل/هماهنگی converter خراب می‌شود.</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="card">
+    <strong>نکته:</strong> در Compose این سه تا «اجباری»‌اند چون فایل compose خودش آن‌ها را تعریف کرده و docservice بهشان
+    <code>depends_on</code> دارد. یعنی برای اجرای همین فایل، باید باشند.
+    در Kubernetes معمولاً این سه را جدا (خارج از chart Docs یا به‌عنوان dependency) می‌آوری — نه لزوماً با ایمیج‌های ONLYOFFICE.
+  </p>
+
+  <h3>ج) اختیاری در Compose</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>سرویس</th>
+        <th>وضعیت</th>
+        <th>به چه درد می‌خورد؟</th>
+        <th>ایمیج</th>
+        <th>اگر نباشد؟</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>adminpanel</code></td>
+        <td><span class="badge-opt">اختیاری برای ادیتور</span></td>
+        <td>پنل مدیریت تنظیمات (مفید برای admin، لازم برای باز شدن سند نیست).</td>
+        <td><code>docs-cluster-de:none-root</code> + <code>command: [adminpanel]</code></td>
+        <td>سند باز می‌شود؛ پنل ادمین نداری.</td>
+      </tr>
+      <tr>
+        <td><code>metrics</code></td>
+        <td><span class="badge-opt">اختیاری</span></td>
+        <td>جمع‌آوری متریک StatsD. در compose فعلی روشن است چون env روی docservice به آن اشاره می‌کند.</td>
+        <td><code>docs-metrics:none-root</code></td>
+        <td>اگر <code>METRICS_ENABLED=true</code> باشد و سرویس نباشد، بهتر است metrics را نگه داری یا متریک را خاموش کنی.</td>
+      </tr>
+      <tr>
+        <td><code>utils</code></td>
+        <td><span class="badge-opt">اختیاری (لوکال تقریباً بی‌استفاده)</span></td>
+        <td>اسکریپت‌های کمکی بیشتر برای محیط Kubernetes/observer.</td>
+        <td><code>docs-utils:none-root</code></td>
+        <td>برای تست ادیتور لوکال معمولاً لازم نیست.</td>
+      </tr>
+      <tr>
+        <td><code>example</code></td>
+        <td><span class="badge-opt">اختیاری</span></td>
+        <td>اپ نمونه برای دموی باز کردن سند.</td>
+        <td><code>docs-example</code> (اگر بیلد شده باشد)</td>
+        <td>Docs خودش کار می‌کند؛ فقط صفحهٔ نمونه نداری. در فایل فعلی با profile جدا شده.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>۳) حداقل مجموعه برای «Docs کار کند» در Compose</h2>
+  <div class="card">
+    <p class="req">اجباری واقعی:</p>
+    <ol>
+      <li><code>proxy</code></li>
+      <li><code>docservice</code></li>
+      <li><code>converter</code> (حداقل ۱)</li>
+      <li><code>postgresql</code> (با schema)</li>
+      <li><code>redis</code></li>
+      <li><code>rabbitmq</code></li>
+    </ol>
+    <p class="opt">اختیاری:</p>
+    <ul>
+      <li><code>adminpanel</code></li>
+      <li><code>metrics</code> (اگر متریک خاموش باشد)</li>
+      <li><code>utils</code></li>
+      <li><code>example</code></li>
+    </ul>
+  </div>
+
+  <h2>۴) ایمیج‌هایی که ساختی ولی Compose لزوماً استفاده نمی‌کند</h2>
+  <table>
+    <thead>
+      <tr><th>ایمیج</th><th>آیا Compose این ریپو به آن نیاز دارد؟</th><th>توضیح</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>docs-cluster-de</code></td>
+        <td><span class="badge-req">بله — اصلی</span></td>
+        <td>پایهٔ proxy/docservice/converter/adminpanel در compose فعلی.</td>
+      </tr>
+      <tr>
+        <td><code>docs-proxy-de</code></td>
+        <td><span class="badge-opt">نه (اختیاری)</span></td>
+        <td>همان محتوای cluster با entrypoint پیش‌فرض proxy. فقط اگر بخواهی به‌جای cluster از این تگ استفاده کنی.</td>
+      </tr>
+      <tr>
+        <td><code>docs-docservice-de</code></td>
+        <td><span class="badge-opt">نه (اختیاری)</span></td>
+        <td>مستعار نقش docservice.</td>
+      </tr>
+      <tr>
+        <td><code>docs-converter-de</code></td>
+        <td><span class="badge-opt">نه (اختیاری)</span></td>
+        <td>مستعار نقش converter.</td>
+      </tr>
+      <tr>
+        <td><code>docs-postgresql</code></td>
+        <td><span class="badge-req">بله در compose فعلی</span></td>
+        <td>یا جایگزینش Postgres معمولی + SQL.</td>
+      </tr>
+      <tr>
+        <td><code>docs-metrics</code></td>
+        <td><span class="badge-opt">بستگی به METRICS_ENABLED</span></td>
+        <td>در فایل فعلی معمولاً بالا می‌آید.</td>
+      </tr>
+      <tr>
+        <td><code>docs-utils</code></td>
+        <td><span class="badge-opt">نه برای ادیتور</span></td>
+        <td>در compose تعریف شده ولی برای تست سند لازم نیست.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>۵) اجرا</h2>
+  <pre><code>docker compose up -d
+docker compose ps
+curl http://localhost/healthcheck
+# انتظار: true</code></pre>
+  <p>پورت: <strong>http://localhost</strong> (نگاشت <code>80:8888</code>)</p>
+
+  <h2>۶) مقایسه با Kubernetes</h2>
+  <p>
+    در Compose، Postgres/Redis/RabbitMQ هم داخل همان فایل «اجباری» شده‌اند چون هدف فایل، یک stack کامل لوکال است.
+    در Kubernetes معمولاً فقط Deploymentهای Docs اجباری‌اند و DB/Redis/MQ را جدا مدیریت می‌کنی.
+    جزئیات: <a href="./fa-kubernetes-helm.html">fa-kubernetes-helm.html</a>
+  </p>
 </main>
 </body>
 </html>

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>راهنمای Kubernetes / Helm — ONLYOFFICE Docker-Docs</title>
+  <title>راهنمای Kubernetes / Helm — سرویس‌های اجباری و اختیاری</title>
   <style>
     :root {
       --bg: #f6f3ff;
@@ -23,7 +23,7 @@
       color: var(--text);
       line-height: 1.85;
     }
-    main { max-width: 920px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+    main { max-width: 1000px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
     h1, h2, h3 { color: #4c1d95; line-height: 1.35; }
     h1 { font-size: 1.7rem; }
     h2 { margin-top: 2rem; border-bottom: 2px solid var(--border); padding-bottom: 0.3rem; }
@@ -35,8 +35,8 @@
       padding: 1rem 1.2rem;
       margin: 1rem 0;
     }
-    table { width: 100%; border-collapse: collapse; margin: 1rem 0; background: #fff; }
-    th, td { border: 1px solid var(--border); padding: 0.55rem 0.7rem; text-align: right; vertical-align: top; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; background: #fff; font-size: 0.94rem; }
+    th, td { border: 1px solid var(--border); padding: 0.55rem 0.65rem; text-align: right; vertical-align: top; }
     th { background: #ddd6fe; }
     code, pre { font-family: ui-monospace, Consolas, monospace; direction: ltr; text-align: left; }
     code { background: #ede9fe; padding: 0.1rem 0.35rem; border-radius: 4px; }
@@ -48,6 +48,9 @@
       overflow-x: auto;
     }
     pre code { background: transparent; color: inherit; padding: 0; }
+    .badge-req { background: #d1fae5; color: #065f46; padding: 0.1rem 0.45rem; border-radius: 999px; font-size: 0.85rem; white-space: nowrap; }
+    .badge-opt { background: #ffedd5; color: #9a3412; padding: 0.1rem 0.45rem; border-radius: 999px; font-size: 0.85rem; white-space: nowrap; }
+    .badge-ext { background: #e0e7ff; color: #3730a3; padding: 0.1rem 0.45rem; border-radius: 999px; font-size: 0.85rem; white-space: nowrap; }
     ol, ul { padding-right: 1.2rem; }
     a { color: var(--accent); }
     .note { border-right: 4px solid var(--accent); padding-right: 0.8rem; }
@@ -55,221 +58,283 @@
 </head>
 <body>
 <main>
-  <h1>راهنمای استفاده در Kubernetes و Helm</h1>
+  <h1>Kubernetes / Helm — چه چیزی باید بالا بیاید؟</h1>
   <p class="lead">
-    این راهنما بعد از ساخت ایمیج‌ها از ریپوی Docker-Docs، مسیر استقرار روی کلاستر را توضیح می‌دهد.
-    Chart رسمی: <a href="https://github.com/ONLYOFFICE/Kubernetes-Docs">ONLYOFFICE/Kubernetes-Docs</a>
+    این صفحه می‌گوید روی کوبر چه workloadهایی لازم است، کدام اختیاری است، هر کدام چه می‌کند،
+    و <strong>چرا لیست اجباری‌ها با Docker Compose فرق دارد</strong>.
   </p>
 
-  <h2>پیش‌فرض مهم</h2>
   <div class="card note">
-    <ul>
-      <li>ایمیج‌های این ریپو برای دیپلوی cluster طراحی شده‌اند.</li>
-      <li>Clustering تجاری معمولاً با لایسنس <strong>Developer / Enterprise</strong> است.</li>
-      <li>کانتینرها به‌صورت پیش‌فرض با کاربر <code>ds</code> / UID <strong>101</strong> اجرا می‌شوند.</li>
-    </ul>
+    <strong>ایمیج‌های رجیستری تو:</strong>
+    <pre><code>repo.mohaymen.ir:3060/starrelease/onlyoffice/docs-cluster-de:none-root
+repo.mohaymen.ir:3060/starrelease/onlyoffice/docs-proxy-de:none-root
+repo.mohaymen.ir:3060/starrelease/onlyoffice/docs-docservice-de:none-root
+repo.mohaymen.ir:3060/starrelease/onlyoffice/docs-converter-de:none-root
+repo.mohaymen.ir:3060/starrelease/onlyoffice/docs-utils:none-root
+repo.mohaymen.ir:3060/starrelease/onlyoffice/docs-metrics:none-root
+repo.mohaymen.ir:3060/starrelease/onlyoffice/docs-postgresql:none-root</code></pre>
   </div>
 
-  <h2>گام ۱ — بیلد و push ایمیج</h2>
-  <pre><code># از ریپوی Docker-Docs
-./build.sh          # یا .\build.ps1 روی ویندوز
+  <h2>۱) اول این را بفهم: اجباری بودنِ «سرویس» ≠ اجباری بودنِ «ایمیج جدا»</h2>
+  <ul>
+    <li>روی K8s باید چند <strong>Deployment/Pod جدا</strong> داشته باشی (proxy، docservice، converter، …).</li>
+    <li>ولی لازم نیست برای هر کدام یک <strong>repository ایمیج جدا</strong> داشته باشی.</li>
+    <li>می‌توانی هر سه را از <code>docs-cluster-de:none-root</code> با <code>args/command</code> متفاوت اجرا کنی.</li>
+    <li>یا طبق پیش‌فرض Helm از <code>docs-proxy-de</code> / <code>docs-docservice-de</code> / <code>docs-converter-de</code> استفاده کنی (محتوا یکی است).</li>
+  </ul>
 
-# تگ برای رجیستری خودت
-docker tag onlyoffice/docs-cluster-de:latest repo.example.com/onlyoffice/docs-cluster-de:9.4.1
-docker tag onlyoffice/docs-utils:latest      repo.example.com/onlyoffice/docs-utils:9.4.1
-docker tag onlyoffice/docs-metrics:latest    repo.example.com/onlyoffice/docs-metrics:9.4.1
+  <h2>۲) چه چیزهایی روی Kubernetes اجباری است؟</h2>
 
-docker push repo.example.com/onlyoffice/docs-cluster-de:9.4.1
-docker push repo.example.com/onlyoffice/docs-utils:9.4.1
-docker push repo.example.com/onlyoffice/docs-metrics:9.4.1</code></pre>
-  <p>
-    برای سازگاری با مقادیر پیش‌فرض قدیمی Helm می‌توانی ایمیج‌های
-    <code>docs-proxy-de</code> / <code>docs-docservice-de</code> / <code>docs-converter-de</code>
-    را هم push کنی؛ یا در values همه را به <code>docs-cluster-de</code> ببری.
-  </p>
-
-  <h2>گام ۲ — وابستگی‌ها</h2>
+  <h3>الف) هسته Docs — بدون این‌ها ادیتور کار نمی‌کند</h3>
   <table>
     <thead>
-      <tr><th>سرویس</th><th>توضیح</th></tr>
+      <tr>
+        <th>Workload</th>
+        <th>وضعیت</th>
+        <th>به چه درد می‌خورد؟</th>
+        <th>ایمیج پیشنهادی</th>
+        <th>اگر نباشد؟</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Deployment <code>proxy</code> + Service/Ingress</td>
+        <td><span class="badge-req">اجباری</span></td>
+        <td>ورودی ترافیک کاربران به کلاستر. Nginx لبه.</td>
+        <td><code>docs-cluster-de:none-root</code> یا <code>docs-proxy-de:none-root</code></td>
+        <td>کاربر به ادیتور نمی‌رسد.</td>
+      </tr>
+      <tr>
+        <td>Deployment <code>docservice</code></td>
+        <td><span class="badge-req">اجباری</span></td>
+        <td>هستهٔ باز کردن سند، API، همکاری هم‌زمان.</td>
+        <td><code>docs-cluster-de:none-root</code> + args <code>docservice</code><br/>یا <code>docs-docservice-de:none-root</code></td>
+        <td>ادیتور کار نمی‌کند.</td>
+      </tr>
+      <tr>
+        <td>Deployment <code>converter</code></td>
+        <td><span class="badge-req">اجباری برای کار واقعی</span></td>
+        <td>تبدیل فایل. معمولاً چند replica.</td>
+        <td><code>docs-cluster-de:none-root</code> + args <code>converter</code><br/>یا <code>docs-converter-de:none-root</code></td>
+        <td>تبدیل/باز کردن بعضی اسناد می‌شکند.</td>
+      </tr>
+      <tr>
+        <td>PVC / Shared storage برای cache فایل‌ها</td>
+        <td><span class="badge-req">اجباری در معماری cluster</span></td>
+        <td>فایل‌های موقت/کش مشترک بین podها (معمولاً زیر <code>/var/lib/onlyoffice</code>).</td>
+        <td>—</td>
+        <td>همکاری چندنودی و cache خراب می‌شود.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>ب) وابستگی‌های خارجی — اجباری‌اند، ولی معمولاً «داخل chart Docs» نیستند</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>سرویس</th>
+        <th>وضعیت</th>
+        <th>به چه درد می‌خورد؟</th>
+        <th>چطور معمولاً می‌آوری؟</th>
+        <th>آیا باید ایمیج ONLYOFFICE باشد؟</th>
+      </tr>
     </thead>
     <tbody>
       <tr>
         <td>PostgreSQL</td>
-        <td>معمولی (≥ ۱۲.۹). لازم نیست ایمیج docs-postgresql باشد. یک‌بار <code>createdb.sql</code> را با Job/Init اجرا کن.</td>
+        <td><span class="badge-ext">اجباری ولی خارجی</span></td>
+        <td>دیتابیس وضعیت Docs</td>
+        <td>Postgres سازمانی / Helm جدا / cloud DB + یک‌بار <code>createdb.sql</code></td>
+        <td><strong>خیر.</strong> <code>docs-postgresql</code> فقط shortcut است.</td>
       </tr>
       <tr>
         <td>Redis</td>
-        <td>برای کش و هماهنگی سشن‌ها</td>
+        <td><span class="badge-ext">اجباری ولی خارجی</span></td>
+        <td>کش و هماهنگی</td>
+        <td>Redis معمولی / Sentinel / Cluster</td>
+        <td>خیر — ایمیج رسمی Redis</td>
       </tr>
       <tr>
-        <td>RabbitMQ (یا ActiveMQ)</td>
+        <td>RabbitMQ یا ActiveMQ</td>
+        <td><span class="badge-ext">اجباری ولی خارجی</span></td>
         <td>صف بین docservice و converter</td>
-      </tr>
-      <tr>
-        <td>Storage / PVC</td>
-        <td>مسیر داده‌هایی مثل <code>/var/lib/onlyoffice</code> با مالکیت مناسب UID 101</td>
+        <td>AMQP معمولی سازمان</td>
+        <td>خیر</td>
       </tr>
     </tbody>
   </table>
-
-  <h2>گام ۳ — اجرای schema روی Postgres معمولی</h2>
-  <p>نمونه مفهوم Job:</p>
-  <pre><code>apiVersion: batch/v1
-kind: Job
-metadata:
-  name: onlyoffice-db-init
-spec:
-  template:
-    spec:
-      restartPolicy: Never
-      containers:
-        - name: psql
-          image: postgres:15
-          env:
-            - name: PGPASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: onlyoffice-db
-                  key: password
-          command: ["bash","-lc"]
-          args:
-            - |
-              psql -h $DB_HOST -U $DB_USER -d $DB_NAME -f /sql/createdb.sql
-          volumeMounts:
-            - name: sql
-              mountPath: /sql
-      volumes:
-        - name: sql
-          configMap:
-            name: onlyoffice-createdb-sql</code></pre>
-  <p>فایل SQL از پکیج Docs: مسیر تقریبی <code>.../documentserver/server/schema/postgresql/createdb.sql</code></p>
-
-  <h2>گام ۴ — مقادیر مهم Helm / securityContext</h2>
-  <pre><code>images:
-  # مثال با رجیستری شخصی و ایمیج یکپارچه
-  # در values واقعی هر کامپوننت repository خودش را دارد؛
-  # می‌توانی همه را به docs-cluster-de تنظیم کنی.
-
-podSecurityContext:
-  enabled: true
-  fsGroup: 101
-
-docservice:
-  containerSecurityContext:
-    enabled: true
-    runAsUser: 101
-    runAsGroup: 101
-    runAsNonRoot: true
-  image:
-    repository: repo.example.com/onlyoffice/docs-cluster-de
-    tag: "9.4.1"
-
-proxy:
-  containerSecurityContext:
-    enabled: true
-    runAsUser: 101
-    runAsGroup: 101
-  image:
-    repository: repo.example.com/onlyoffice/docs-cluster-de
-    tag: "9.4.1"
-
-converter:
-  containerSecurityContext:
-    enabled: true
-    runAsUser: 101
-    runAsGroup: 101
-  image:
-    repository: repo.example.com/onlyoffice/docs-cluster-de
-    tag: "9.4.1"</code></pre>
   <p class="card">
-    پیش‌فرض chart ممکن است نام‌های جدا مثل <code>docs-docservice-de</code> باشد
-    (backward compatibility). خود ONLYOFFICE گفته می‌توانی به‌جایشان
-    <code>docs-cluster-de</code> بگذاری.
+    این سه تا از نظر Docs «لازم»‌اند، ولی در K8s برخلاف Compose معمولاً به‌عنوان سرویس داخل همان
+    <code>docker-compose.yml</code> تعریف نمی‌شوند؛ از قبل در کلاستر موجود فرض می‌شوند یا با chart جدا نصب می‌شوند.
   </p>
 
-  <h2>گام ۵ — لایسنس Developer/Enterprise</h2>
-  <ul>
-    <li>فایل خریداری‌شده: <code>license.lic</code></li>
-    <li>معمولاً روی مسیر داده‌ای معادل <code>/var/www/onlyoffice/Data/license.lic</code> مونت می‌شود</li>
-    <li>بدون لایسنس، ایمیج <code>-de</code> ممکن است بالا بیاید ولی امکانات کامل/cluster محدود است</li>
-  </ul>
-
-  <h2>گام ۶ — نصب Helm (الگو)</h2>
-  <pre><code>helm repo add onlyoffice https://download.onlyoffice.com/charts/stable
-helm repo update
-
-helm upgrade --install docs onlyoffice/docs \
-  -n onlyoffice --create-namespace \
-  -f my-values.yaml</code></pre>
-  <p>نام chart و repo را با نسخهٔ فعلی مستندات رسمی تطبیق بده؛ ممکن است با گذر زمان عوض شود.</p>
-
-  <h2>چک سلامت بعد از دیپلوی</h2>
-  <pre><code>kubectl -n onlyoffice get pods
-kubectl -n onlyoffice logs deploy/docs-docservice --tail=100
-curl https://&lt;your-ingress-host&gt;/healthcheck
-# انتظار: true</code></pre>
-  <p>داخل pod باید کاربر غیر روت باشد (۱۰۱)، مگر اینکه securityContext را خاموش کرده باشی.</p>
-
-  <h2>تفاوت با Docker Compose</h2>
+  <h3>ج) اختیاری روی Kubernetes</h3>
   <table>
     <thead>
-      <tr><th>موضوع</th><th>Compose</th><th>Kubernetes</th></tr>
+      <tr>
+        <th>Workload / جزء</th>
+        <th>وضعیت</th>
+        <th>به چه درد می‌خورد؟</th>
+        <th>ایمیج</th>
+        <th>اگر نباشد؟</th>
+      </tr>
     </thead>
     <tbody>
       <tr>
-        <td>ورود ترافیک</td>
-        <td>پورت ۸۰ روی proxy</td>
-        <td>Ingress / Service + proxy Deployment</td>
+        <td><code>adminpanel</code></td>
+        <td><span class="badge-opt">اختیاری برای ادیتور</span></td>
+        <td>UI مدیریت تنظیمات سرور</td>
+        <td><code>docs-cluster-de:none-root</code> + args adminpanel</td>
+        <td>سند باز می‌شود؛ پنل ادمین نداری</td>
       </tr>
       <tr>
-        <td>ایمیج Docs</td>
-        <td>عمدتاً cluster</td>
-        <td>cluster یا ایمیج‌های جدا (هر دو ممکن)</td>
+        <td><code>metrics</code></td>
+        <td><span class="badge-opt">اختیاری</span></td>
+        <td>StatsD / مانیتورینگ داخلی</td>
+        <td><code>docs-metrics:none-root</code></td>
+        <td>ادیتور کار می‌کند؛ متریک داخلی نداری</td>
       </tr>
       <tr>
-        <td>Postgres</td>
-        <td>سرویس داخلی compose</td>
-        <td>معمولاً خارجی/مدیریت‌شده + Job برای SQL</td>
+        <td><code>utils</code> / observer scripts</td>
+        <td><span class="badge-opt">اختیاری / موقعیتی</span></td>
+        <td>اسکریپت‌های کمکی balancer/observer در معماری پیشرفته K8s</td>
+        <td><code>docs-utils:none-root</code></td>
+        <td>برای استقرار ساده غالباً لازم نیست</td>
       </tr>
       <tr>
-        <td>مقیاس</td>
-        <td><code>--scale converter=N</code></td>
-        <td>replicas / HPA روی Deploymentها</td>
+        <td><code>example</code></td>
+        <td><span class="badge-opt">اختیاری</span></td>
+        <td>اپ نمونه دمو</td>
+        <td>docs-example</td>
+        <td>روی production معمولاً نمی‌آید</td>
       </tr>
       <tr>
-        <td>لایسنس cluster</td>
-        <td>برای تست لوکال</td>
-        <td>برای production چندنودی مهم‌تر است</td>
+        <td><code>docs-postgresql</code> به‌عنوان Deployment</td>
+        <td><span class="badge-opt">اختیاری</span></td>
+        <td>فقط اگر نخواهی Postgres سازمان را استفاده کنی</td>
+        <td><code>docs-postgresql:none-root</code></td>
+        <td>بهتر است Postgres استاندارد + Job برای SQL</td>
+      </tr>
+      <tr>
+        <td>ایمیج‌های <code>docs-proxy-de</code> / <code>docs-docservice-de</code> / <code>docs-converter-de</code></td>
+        <td><span class="badge-opt">اختیاری</span></td>
+        <td>فقط اگر Helm را با نام‌های پیش‌فرض جدا می‌خواهی</td>
+        <td>همان‌ها با تگ <code>none-root</code></td>
+        <td>اگر همه را روی <code>docs-cluster-de</code> بگذاری لازم نیستند</td>
       </tr>
     </tbody>
   </table>
-  <div class="card note">
-    <strong>اشتباه رایج:</strong> «Compose به ایمیج جدا نیاز ندارد ولی K8s نیاز دارد.»
-    <br />
-    <strong>درست:</strong> هر دو می‌توانند با <code>docs-cluster</code> کار کنند.
-    Helm فقط به‌صورت پیش‌فرض نام جدا می‌گذارد (backward compatibility).
-    توضیح کامل و تخصصی:
-    <a href="./fa-images-cluster-vs-split.html">fa-images-cluster-vs-split.html</a>
+
+  <h2>۳) چرا لیست اجباری Compose با Kubernetes فرق دارد؟</h2>
+  <p>این مهم‌ترین بخش است:</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>موضوع</th>
+        <th>Docker Compose این ریپو</th>
+        <th>Kubernetes / Helm</th>
+        <th>چرا فرق دارد؟</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>هدف فایل/ابزار</td>
+        <td>یک stack کامل «همه‌چیز با هم» برای لپ‌تاپ</td>
+        <td>استقرار تولید روی کلاستر موجود</td>
+        <td>Compose برای دمو/توسعه است؛ K8s برای عملیات سازمانی.</td>
+      </tr>
+      <tr>
+        <td>Postgres / Redis / RabbitMQ</td>
+        <td>داخل همان <code>docker-compose.yml</code> تعریف و <strong>اجباری</strong> شده‌اند</td>
+        <td>معمولاً <strong>خارجی</strong>‌اند (از قبل در کلاستر یا chart جدا)</td>
+        <td>در سازمان اغلب DB/MQ مشترک از قبل وجود دارد؛ Helm Docs فرض می‌کند آدرس آن‌ها را می‌دهی، نه اینکه حتماً خودش Postgres بسازد.</td>
+      </tr>
+      <tr>
+        <td>سرویس‌های Docs (proxy/docservice/converter)</td>
+        <td>اجباری</td>
+        <td>اجباری</td>
+        <td>این بخش در هر دو محیط یکی است — هستهٔ محصول.</td>
+      </tr>
+      <tr>
+        <td>تعداد ایمیج Docs</td>
+        <td>عملاً ۱ ایمیج (<code>cluster</code>) برای چند سرویس</td>
+        <td>۱ ایمیج کافی است؛ یا ۳ نام جدا برای سازگاری Helm</td>
+        <td>فرق در قرارداد نام‌گذاری است، نه در معماری لازم.</td>
+      </tr>
+      <tr>
+        <td><code>docs-postgresql</code></td>
+        <td>در compose فعلی برای راحتی اجباری شده</td>
+        <td>اختیاری؛ Postgres معمولی + SQL بهتر است</td>
+        <td>در لوکال می‌خواهند یک دستور همه را بالا بیاورد؛ در کوبر نمی‌خواهند DB داخل همان اپ قفل شود.</td>
+      </tr>
+      <tr>
+        <td><code>utils</code></td>
+        <td>در فایل هست ولی برای ادیتور لازم نیست</td>
+        <td>فقط در سناریوهای خاص observer/balancer</td>
+        <td>ابزار عملیات است، نه مسیر حیاتی باز کردن سند.</td>
+      </tr>
+      <tr>
+        <td>Ingress / Service</td>
+        <td>پورت مستقیم <code>80:8888</code> روی proxy</td>
+        <td>Service + Ingress/LoadBalancer اجباری برای دسترسی بیرونی</td>
+        <td>مدل شبکه کلاستر فرق دارد.</td>
+      </tr>
+      <tr>
+        <td>PVC مشترک</td>
+        <td>named volume ساده</td>
+        <td>در معماری چندنودی خیلی مهم‌تر است</td>
+        <td>چند pod روی چند node باید به دادهٔ مشترک برسند.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>۴) پس «سرویس اجباری» در دو محیط یعنی چه؟</h2>
+  <div class="card">
+    <p><strong>در Compose:</strong> هر چیزی که داخل همان فایل تعریف شده و بقیه به آن <code>depends_on</code> دارند، عملاً اجباریِ اجرای آن فایل است — حتی اگر از نظر معماری بشود جایش را با سرویس خارجی عوض کرد.</p>
+    <p><strong>در Kubernetes:</strong> اجباری = چیزهایی که بدون آن‌ها Docs از کار می‌افتد (proxy/docservice/converter + DB + Redis + MQ + storage). ولی شکل آوردنشان آزادتر است: DB/Redis/MQ را خودت جدا می‌آوری.</p>
   </div>
 
-  <h2>چک‌لیست قبل از خرید/پروداکشن</h2>
+  <h2>۵) حداقل مجموعه پیشنهادی برای K8s تو</h2>
   <ol>
-    <li>ایمیج با فیکس CRLF بیلد و push شده</li>
-    <li>securityContext با ۱۰۱ فعال است و PVC قابل نوشتن است</li>
-    <li>DB schema اعمال شده</li>
-    <li>Redis و AMQP سالم‌اند</li>
-    <li>JWT درست تنظیم شده</li>
-    <li>برای محصول فروشی: مسیر Developer + لایسنس مناسب connections/cluster</li>
+    <li><span class="badge-req">اجباری</span> Deploymentهای <code>proxy</code> + <code>docservice</code> + <code>converter</code></li>
+    <li><span class="badge-req">اجباری</span> Postgres (معمولی) + یک‌بار <code>createdb.sql</code></li>
+    <li><span class="badge-req">اجباری</span> Redis</li>
+    <li><span class="badge-req">اجباری</span> RabbitMQ/ActiveMQ</li>
+    <li><span class="badge-req">اجباری</span> Service/Ingress + PVC با <code>fsGroup: 101</code></li>
+    <li><span class="badge-opt">اختیاری</span> adminpanel / metrics / utils</li>
+    <li><span class="badge-opt">اختیاری</span> ایمیج‌های split (<code>docs-*-de</code>) اگر همه را روی <code>docs-cluster-de</code> بگذاری</li>
   </ol>
 
-  <p class="card">
-    جزئیات تجربه بیلد محلی در فایل‌های
-    <code>fa-build-report.md</code> / <code>fa-build-report.html</code>
-    و راهنمای Compose در
-    <code>fa-docker-compose.html</code>
-    آمده است.
+  <h2>۶) نمونه values با ایمیج‌های تو</h2>
+  <pre><code># همه نقش‌ها از یک ایمیج cluster
+proxy:
+  image:
+    repository: repo.mohaymen.ir:3060/starrelease/onlyoffice/docs-cluster-de
+    tag: none-root
+docservice:
+  image:
+    repository: repo.mohaymen.ir:3060/starrelease/onlyoffice/docs-cluster-de
+    tag: none-root
+converter:
+  image:
+    repository: repo.mohaymen.ir:3060/starrelease/onlyoffice/docs-cluster-de
+    tag: none-root
+
+podSecurityContext:
+  enabled: true
+  fsGroup: 101</code></pre>
+  <p>
+    اگر Helm را دست‌نخورده با defaults بخواهی، به‌جای cluster از
+    <code>docs-proxy-de</code> / <code>docs-docservice-de</code> / <code>docs-converter-de</code>
+    با همان تگ <code>none-root</code> استفاده کن.
   </p>
+
+  <h2>۷) لینک مرتبط</h2>
+  <ul>
+    <li><a href="./fa-docker-compose.html">سرویس‌های Compose — اجباری/اختیاری</a></li>
+    <li><a href="./fa-images-cluster-vs-split.html">تفاوت ایمیج cluster و ایمیج‌های جدا</a></li>
+  </ul>
 </main>
 </body>
 </html>
