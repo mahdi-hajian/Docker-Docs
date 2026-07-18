@@ -1,0 +1,457 @@
+# ONLYOFFICE Docs — Kubernetes manifests (minimal, no LoadBalancer)
+#
+# Registry images (yours):
+#   repo.mohaymen.ir:3060/starrelease/onlyoffice/docs-cluster-de:none-root
+#   (+ optional split images; this file uses docs-cluster-de for all Docs roles)
+#
+# What this file deploys:
+#   - Namespace onlyoffice
+#   - Secret (EDIT ME) for Postgres / JWT / Redis / RabbitMQ passwords
+#   - Job: apply createdb.sql onto YOUR existing Postgres
+#   - Redis + RabbitMQ (simple in-cluster; replace with your prod ones later if you want)
+#   - PVC for shared Docs cache
+#   - Deployments: proxy, docservice (replicas=1), converter (replicas=1)
+#   - ClusterIP Services (NO LoadBalancer) — use: kubectl -n onlyoffice port-forward svc/proxy 8080:80
+#
+# Apply:
+#   1) Edit Secret onlyoffice-config below (DB_HOST must point to YOUR Postgres)
+#   2) kubectl apply -f manifests/onlyoffice-docs.yaml
+#   3) Wait for Job onlyoffice-db-init to Complete BEFORE relying on docservice
+#      kubectl -n onlyoffice wait --for=condition=complete job/onlyoffice-db-init --timeout=180s
+#
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: onlyoffice
+---
+# ---------------------------------------------------------------------------
+# EDIT THIS SECRET before apply
+# ---------------------------------------------------------------------------
+apiVersion: v1
+kind: Secret
+metadata:
+  name: onlyoffice-config
+  namespace: onlyoffice
+type: Opaque
+stringData:
+  # --- Your production Postgres ---
+  DB_TYPE: "postgres"
+  DB_HOST: "YOUR_POSTGRES_HOST"          # e.g. postgres.database.svc.cluster.local OR external IP/DNS
+  DB_PORT: "5432"
+  DB_NAME: "onlyoffice"                  # database must already exist (empty is OK)
+  DB_USER: "onlyoffice"
+  DB_PWD: "CHANGE_ME_DB_PASSWORD"
+
+  # --- JWT (must match your product integration) ---
+  JWT_ENABLED: "true"
+  JWT_HEADER: "Authorization"
+  JWT_SECRET: "CHANGE_ME_JWT_SECRET"
+
+  # --- Redis (this manifest's in-cluster redis service name is "redis") ---
+  REDIST_SERVER_HOST: "redis"
+  REDIS_SERVER_HOST: "redis"
+  REDIS_SERVER_PORT: "6379"
+  REDIS_SERVER_PWD: ""
+
+  # --- RabbitMQ (this manifest's in-cluster service name is "rabbitmq") ---
+  AMQP_TYPE: "rabbitmq"
+  AMQP_HOST: "rabbitmq"
+  AMQP_PORT: "5672"
+  AMQP_USER: "guest"
+  AMQP_PWD: "guest"
+---
+# Shared cache/files between proxy / docservice / converter
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: onlyoffice-data
+  namespace: onlyoffice
+spec:
+  accessModes:
+    - ReadWriteMany
+  # If your StorageClass has no RWX, use ReadWriteOnce and keep all Docs pods on one node
+  # (or change to your RWX class). For a first test RWO + single node is OK.
+  resources:
+    requests:
+      storage: 20Gi
+  # storageClassName: your-rwx-storageclass
+---
+# ========================= Redis (simple) =========================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: onlyoffice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7
+          ports:
+            - containerPort: 6379
+              name: redis
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: onlyoffice
+spec:
+  selector:
+    app: redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+---
+# ========================= RabbitMQ (simple) =========================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq
+  namespace: onlyoffice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+    spec:
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:3
+          ports:
+            - containerPort: 5672
+              name: amqp
+          readinessProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "-q", "ping"]
+            initialDelaySeconds: 15
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  namespace: onlyoffice
+spec:
+  selector:
+    app: rabbitmq
+  ports:
+    - name: amqp
+      port: 5672
+      targetPort: 5672
+---
+# ========================= DB INIT: createdb.sql on YOUR Postgres =========================
+#
+# How this works:
+#   1) initContainer copies createdb.sql OUT of the Docs image
+#      Path inside docs-cluster / docs image:
+#        /var/www/onlyoffice/documentserver/server/schema/postgresql/createdb.sql
+#      (same file also exists in docs-postgresql at:
+#        /docker-entrypoint-initdb.d/createdb.sql)
+#   2) main container (postgres client) runs:
+#        psql -h $DB_HOST -U $DB_USER -d $DB_NAME -f /sql/createdb.sql
+#
+# Prerequisites on YOUR Postgres:
+#   - Database DB_NAME already created
+#   - User DB_USER can connect and create tables in that DB
+#   - Network from this Job pod to DB_HOST:DB_PORT is open
+#
+# Re-run:
+#   kubectl -n onlyoffice delete job onlyoffice-db-init
+#   kubectl apply -f manifests/onlyoffice-docs.yaml
+#
+# Manual alternative (if you prefer ConfigMap):
+#   docker create --name oo-tmp repo.mohaymen.ir:3060/starrelease/onlyoffice/docs-postgresql:none-root
+#   docker cp oo-tmp:/docker-entrypoint-initdb.d/createdb.sql ./createdb.sql
+#   docker rm oo-tmp
+#   kubectl -n onlyoffice create configmap onlyoffice-createdb --from-file=createdb.sql
+#   then change the Job to mount that ConfigMap instead of extracting from the image.
+#
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: onlyoffice-db-init
+  namespace: onlyoffice
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app: onlyoffice-db-init
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+        - name: extract-sql
+          image: repo.mohaymen.ir:3060/starrelease/onlyoffice/docs-cluster-de:none-root
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              SRC="/var/www/onlyoffice/documentserver/server/schema/postgresql/createdb.sql"
+              if [ ! -f "$SRC" ]; then
+                echo "ERROR: createdb.sql not found at $SRC"
+                ls -la /var/www/onlyoffice/documentserver/server/schema/postgresql/ || true
+                exit 1
+              fi
+              cp "$SRC" /sql/createdb.sql
+              echo "copied createdb.sql ($(wc -c < /sql/createdb.sql) bytes)"
+          volumeMounts:
+            - name: sql
+              mountPath: /sql
+      containers:
+        - name: apply-sql
+          image: postgres:15
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: onlyoffice-config
+                  key: DB_HOST
+            - name: DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: onlyoffice-config
+                  key: DB_PORT
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: onlyoffice-config
+                  key: DB_NAME
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: onlyoffice-config
+                  key: DB_USER
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: onlyoffice-config
+                  key: DB_PWD
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              echo "Applying schema to ${DB_HOST}:${DB_PORT}/${DB_NAME} as ${DB_USER}"
+              until pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER"; do
+                echo "waiting for postgres..."
+                sleep 3
+              done
+              # If schema already applied, psql may error on "already exists".
+              # First install: OK. Re-run: either ignore errors or drop/recreate DB.
+              psql -v ON_ERROR_STOP=1 \
+                -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
+                -f /sql/createdb.sql
+              echo "createdb.sql applied successfully"
+          volumeMounts:
+            - name: sql
+              mountPath: /sql
+              readOnly: true
+      volumes:
+        - name: sql
+          emptyDir: {}
+---
+# ========================= Shared env for Docs pods =========================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: onlyoffice-docs-env
+  namespace: onlyoffice
+data:
+  DOCSERVICE_HOST_PORT: "docservice:8000"
+  ADMINPANEL_HOST_PORT: "docservice:8000"
+  EXAMPLE_HOST_PORT: "docservice:8000"
+  METRICS_ENABLED: "false"
+---
+# ========================= proxy =========================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: proxy
+  namespace: onlyoffice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: proxy
+  template:
+    metadata:
+      labels:
+        app: proxy
+    spec:
+      securityContext:
+        fsGroup: 101
+      containers:
+        - name: proxy
+          image: repo.mohaymen.ir:3060/starrelease/onlyoffice/docs-cluster-de:none-root
+          imagePullPolicy: IfNotPresent
+          command: ["proxy-docker-entrypoint.sh"]
+          ports:
+            - name: http
+              containerPort: 8888
+          envFrom:
+            - configMapRef:
+                name: onlyoffice-docs-env
+          env:
+            - name: DOCSERVICE_HOST_PORT
+              value: "docservice:8000"
+            - name: EXAMPLE_HOST_PORT
+              value: "docservice:8000"
+          securityContext:
+            runAsUser: 101
+            runAsGroup: 101
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/onlyoffice
+          readinessProbe:
+            tcpSocket:
+              port: 8888
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: onlyoffice-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: proxy
+  namespace: onlyoffice
+spec:
+  type: ClusterIP
+  selector:
+    app: proxy
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8888
+---
+# ========================= docservice (replicas = 1) =========================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: docservice
+  namespace: onlyoffice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: docservice
+  template:
+    metadata:
+      labels:
+        app: docservice
+    spec:
+      securityContext:
+        fsGroup: 101
+      containers:
+        - name: docservice
+          image: repo.mohaymen.ir:3060/starrelease/onlyoffice/docs-cluster-de:none-root
+          imagePullPolicy: IfNotPresent
+          args: ["docservice"]
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - secretRef:
+                name: onlyoffice-config
+            - configMapRef:
+                name: onlyoffice-docs-env
+          securityContext:
+            runAsUser: 101
+            runAsGroup: 101
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/onlyoffice
+          readinessProbe:
+            httpGet:
+              path: /info/info.json
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 12
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: onlyoffice-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: docservice
+  namespace: onlyoffice
+spec:
+  type: ClusterIP
+  selector:
+    app: docservice
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+---
+# ========================= converter (1 replica for now) =========================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: converter
+  namespace: onlyoffice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: converter
+  template:
+    metadata:
+      labels:
+        app: converter
+    spec:
+      securityContext:
+        fsGroup: 101
+      containers:
+        - name: converter
+          image: repo.mohaymen.ir:3060/starrelease/onlyoffice/docs-cluster-de:none-root
+          imagePullPolicy: IfNotPresent
+          args: ["converter"]
+          envFrom:
+            - secretRef:
+                name: onlyoffice-config
+            - configMapRef:
+                name: onlyoffice-docs-env
+          securityContext:
+            runAsUser: 101
+            runAsGroup: 101
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/onlyoffice
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: onlyoffice-data
